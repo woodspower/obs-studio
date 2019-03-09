@@ -58,7 +58,7 @@ int hashSetP(hashTab *head, char *name, void *pval)
     if ((np = hashGetP(head, name)) == NULL) { /* not found */
         np = (struct nlist *) malloc(sizeof(*np));
         if (np == NULL || (np->name = strdup(name)) == NULL)
-          return ENOMEM;
+          return -ENOMEM;
         hindex = eval(name, head->gHashSize);
         np->next = head->gHashtab[hindex];
         head->gHashtab[hindex] = np;
@@ -76,7 +76,7 @@ int hashGetI(hashTab *head, char *s)
     for (np = tab[eval(s,size)]; np != NULL; np = np->next)
         if (strcmp(s, np->name) == 0)
           return np->ival; /* found */
-    return ENOENT; /* not found */
+    return -ENOENT; /* not found */
 }
 
 /* hashSetI: put (name, ival) in Hashtab */
@@ -87,7 +87,7 @@ int hashSetI(hashTab *head, char *name, int ival)
     if ((np = hashGetP(head, name)) == NULL) { /* not found */
         np = (struct nlist *) malloc(sizeof(*np));
         if (np == NULL || (np->name = strdup(name)) == NULL)
-          return ENOMEM;
+          return -ENOMEM;
         hindex = eval(name, head->gHashSize);
         np->next = head->gHashtab[hindex];
         head->gHashtab[hindex] = np;
