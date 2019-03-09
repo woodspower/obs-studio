@@ -20,7 +20,9 @@ leo, lili
 #include <jansson.h>
 #include <assert.h>
 #include "simple_hash.h"
+#include "long_hash.h"
 
+#include <unistd.h>
 
 #define LOGD(FORMAT, args...)   printf(FORMAT, ##args)
 #define LOGI(FORMAT, args...)   printf(FORMAT, ##args)
@@ -29,6 +31,8 @@ leo, lili
 
 /* max 10000 boxes in one obs buffer */
 #define OBS_BOX_NUM_MAX  10000
+/* max 10000 batchs in one tft buffer */
+#define TFT_BATCH_NUM_MAX 10000
 /* max 1000 areas in one tft batch */
 #define TFT_AREA_NUM_MAX  1000
 /* name string should not longer than 128 char */
@@ -43,6 +47,8 @@ leo, lili
 typedef struct obs_box {
 	char *name;
     void *handle;
+    /* if==1 ON, if==0 OFF */
+    int  status;
 	struct obs_box *prev;
 	struct obs_box *next;
 	unsigned xmin;
@@ -105,6 +111,7 @@ typedef struct tft_buffer {
 	char *name;
     obs_buffer_t *obsBuffer;
 	struct tft_batch *batchs;
+    hashLongTab *batchHash;
 }tft_buffer_t;
 
 
@@ -136,6 +143,7 @@ obs_box_t * obs_box_alloc(char *name)
 {
     obs_box_t *box = (obs_box_t *)malloc(sizeof(obs_box_t));
     box->name = strdup(name);
+    box->status = 0;
     box->prev = box;
     box->next = box;
     box->xmin = 0;
@@ -167,7 +175,7 @@ void obs_batch_insert(obs_batch_t *old, obs_batch_t *new)
 obs_batch_t * obs_batch_alloc(void)
 {
     int i;
-    static long ref = 1;
+    static long ref = 20190302153001;
     obs_batch_t *tmp;
     tmp = (obs_batch_t *)malloc(sizeof(obs_batch_t));
     tmp->ref = ref++;
@@ -187,11 +195,8 @@ obs_buffer_t * obs_buffer_load(void)
     assert(buffer != NULL);
     buffer->name = strdup(TEST_BUFFER_NAME);
     buffer->boxes = NULL;
-/*
-    buffer->batchs = obs_batch_alloc();
-    old = buffer->batchs;
-*/
     old = NULL;
+
     for(i=0; i<TEST_BUFFER_BATCH_NUM; i++)
     {
         new = obs_batch_alloc();
@@ -208,6 +213,40 @@ obs_buffer_t * obs_buffer_load(void)
 void obs_buffer_free(obs_buffer_t *buffer)
 {
     return;
+}
+
+void obs_buffer_reset(obs_buffer_t *buf)
+{
+    obs_box_t *box, *box0;
+
+    if(buf == NULL) return;
+
+    box0 = buf->boxes;
+    box = box0;
+    do {
+        if(box == NULL) return;
+        box->status = 0;
+        box = box->next;
+    }while(box != box0);
+}
+
+void obs_boxes_show(obs_buffer_t *buf)
+{
+    char * name;
+    obs_box_t *box, *box0;
+
+    if(buf == NULL) return;
+
+    box0 = buf->boxes;
+    box = box0;
+    do {
+        assert(box != NULL);
+        if(box->status == 1) {
+            printf("------Box name: %s\n", box->name);
+            printf("(xmin,ymin,xmax,ymax): (%d,%d,%d,%d)\n",box->xmin,box->ymin,box->xmax,box->ymax);
+        }
+        box = box->next;
+    }while(box != box0);
 }
 
 /* tft area assocate with obs box */
@@ -384,6 +423,30 @@ tft_batch_t * tft_batch_alloc(json_t *unit, tft_buffer_t *buffer)
     return tmp;
 }
 
+void tft_batch_active(tft_batch_t *batch)
+{
+    tft_area_t *area, *area0;
+    obs_box_t *box;
+
+    if(batch == NULL) return;
+
+    area0 = batch->areas;
+    area = area0;
+    do {
+        assert(area != NULL);
+        box = area->box;
+        assert(box != NULL);
+
+        box->status = 1;
+        box->xmin = area->xmin;
+        box->ymin = area->ymin;
+        box->xmax = area->xmax;
+        box->ymax = area->ymax;
+
+        area = area->next;
+    }while(area != area0);
+}
+
 tft_buffer_t * tft_buffer_load(json_t *root, obs_buffer_t *obsBuffer)
 {
     int i;
@@ -401,6 +464,8 @@ tft_buffer_t * tft_buffer_load(json_t *root, obs_buffer_t *obsBuffer)
     assert(buffer != NULL);
     buffer->obsBuffer = obsBuffer;
 
+    /* init batchHash */
+    buffer->batchHash = hashLongInit(TFT_BATCH_NUM_MAX);
     
     unit = json_object_get(root, "name");
     assert(json_typeof(unit) == JSON_STRING);
@@ -413,6 +478,8 @@ tft_buffer_t * tft_buffer_load(json_t *root, obs_buffer_t *obsBuffer)
     for(i=0; i<json_array_size(unit); i++)
     {
         new = tft_batch_alloc(json_array_get(unit, i), buffer);
+        assert(new != NULL);
+        hashLongSetP(buffer->batchHash, new->ref, (void*)new);
         tft_batch_insert(old, new);
         old = new;
     }
@@ -475,9 +542,9 @@ void obs_buffer_print(obs_buffer_t *buf)
 }
 
 
-/*
 void tft_buffer_print(tft_buffer_t *buf)
 {
+    char *name;
     tft_batch_t *batch, *batch0;
     tft_area_t *area, *area0;
     if(buf == NULL) {
@@ -492,22 +559,58 @@ void tft_buffer_print(tft_buffer_t *buf)
     do {
         assert(batch != NULL);
         printf("------Batch ref: %ld\n", batch->ref);
-        printf("xlen: %4d, ylen: %4d\n", batch->xlen, batch->ylen);
+        printf("------app.scence: %s.%s\n", batch->appType, batch->scenceType);
+
+        area0 = batch->areas;
+        area = area0;
+        do {
+            assert(area != NULL);
+            printf("----area name: type[%d]-%s-seq[%d]\n", area->atype, area->name, area->seq);
+            printf("(xmin,ymin,xmax,ymax): (%d,%d,%d,%d)\n",area->xmin,area->ymin,area->xmax,area->ymax);
+            area = area->next;
+        }while(area != area0);
+
         batch = batch->next;
     }while(batch != batch0);
-
-    box0 = buf->boxes;
-    box = box0;
-    do {
-        assert(box != NULL);
-        printf("------Box name: %s\n", box->name);
-        printf("(xmin,ymin,xmax,ymax): (%d,%d,%d,%d)\n",box->xmin,box->ymin,box->xmax,box->ymax);
-        box = box->next;
-    }while(box != box0);
-
 }
 
-*/
+
+void test_run(tft_buffer_t *tftBuffer)
+{
+    obs_buffer_t *obsBuffer;
+    obs_batch_t *batch, *batch0;
+    obs_box_t *box, *box0;
+    hashLongTab *tftBatchHash;
+    tft_batch_t *tftBatch;
+
+    obsBuffer = tftBuffer->obsBuffer;
+    tftBatchHash = tftBuffer->batchHash;
+    if(obsBuffer == NULL) {
+        printf("OBS BUFFER is empty.\n");
+        return;
+    }
+
+    printf("*************Run obs Buffer: %s ***************\n", obsBuffer->name);
+    batch0 = obsBuffer->batchs;
+    batch = batch0;
+    do {
+        obs_buffer_reset(obsBuffer);
+        assert(batch != NULL);
+        printf("------OBS Batch ref: %ld  ", batch->ref);
+        printf("xlen: %4d, ylen: %4d\n", batch->xlen, batch->ylen);
+        tftBatch = (tft_batch_t *)hashLongGetP(tftBatchHash, batch->ref);
+        if(tftBatch == NULL) {
+            printf("----NO MATCH TFT\n");
+        }
+        else {
+            tft_batch_active(tftBatch);
+            obs_boxes_show(obsBuffer);
+        }
+        sleep(1);
+        batch = batch->next;
+    }while(batch != batch0);
+}
+
 
 int main(int argc, char *argv[]) {
     obs_buffer_t *obsBuffer;
@@ -533,6 +636,9 @@ int main(int argc, char *argv[]) {
     tftBuffer = tft_buffer_load(root, obsBuffer);
     
     obs_buffer_print(obsBuffer);
+    tft_buffer_print(tftBuffer);
+
+    test_run(tftBuffer);
     
     json_decref(root);
 
