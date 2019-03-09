@@ -4,7 +4,7 @@
     {   "ref" : 20190302153001,
         "app" : "qj",
         "scence" : "passthrough",
-        "areas" : [
+        "subareas" : [
         {   "type" : "actor",
             "xmin" : 0,
             "ymin" : 0,
@@ -27,7 +27,7 @@
     {   "ref" : 20190302153002,
         "app" : "qj",
         "scence" : "upgrade",
-        "areas" : [
+        "subareas" : [
         {   "type" : "actor",
             "xmin" : 0,
             "ymin" : 0,
