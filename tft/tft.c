@@ -264,6 +264,7 @@ void tft_area_associate(tft_area_t *new)
 {
     obs_buffer_t *obsBuffer = new->batch->buffer->obsBuffer;
     hashTab *boxHash;
+    hashItem *item;
     obs_box_t *box;
     char * key;
 
@@ -280,8 +281,12 @@ void tft_area_associate(tft_area_t *new)
         }
     }
 
-    box = (obs_box_t *)hashGetP(boxHash, key);
-    if(box == NULL) {
+    item = hashGetP(boxHash, key);
+    if (item != NULL) {
+        assert(item->pval != NULL);
+        box = (obs_box_t *)item->pval;
+    }
+    else {
         /* check if associate existing box */
         if(new->box != NULL) box=new->box;
         else box = obs_box_alloc(key);
@@ -441,8 +446,9 @@ void tft_batch_new(tft_buffer_t *buf, long ref, char *appName, char *scenceName)
 /* create new subarea in exist tft batch */
 void tft_subarea_new(tft_batch_t *batch, char *name, int x1, int x2, int y1, int y2)
 {
-    int seq;
+    int seq = 0;
     tft_area_t *subarea;
+    hashItem *item;
     if(batch == NULL || batch->appName == NULL || batch->scenceName == NULL \
         || batch->areaHash == NULL ) {
         LOGE("ERROR: call tft_area_new with null batch. \
@@ -454,10 +460,10 @@ void tft_subarea_new(tft_batch_t *batch, char *name, int x1, int x2, int y1, int
     LOGD("tft_subarea_new in batch ref:%ld\n", batch->ref);
 
     /* seq areas with same name */
-    seq = hashGetI(batch->areaHash, name);
+    item = hashGetI(batch->areaHash, name);
+    if (item != NULL) seq = item->ival + 1;
+    else seq = 1;
     LOGD("hashGetI(%s)=%d\n",name,seq);
-    if(seq <= 0) seq = 1;
-    else seq += 1;
     assert(hashSetI(batch->areaHash, name, seq)>=0);
     subarea = tft_area_alloc(name, seq, TFT_AREA_TYPE_SUBAREA, batch, NULL);
     subarea->xmin = x1;
@@ -722,6 +728,7 @@ void test_run(tft_buffer_t *tftBuffer)
     obs_batch_t *batch, *batch0;
     obs_box_t *box, *box0;
     hashLongTab *tftBatchHash;
+    hashLongItem *item;
     tft_batch_t *tftBatch;
 
     obsBuffer = tftBuffer->obsBuffer;
@@ -739,11 +746,12 @@ void test_run(tft_buffer_t *tftBuffer)
         assert(batch != NULL);
         printf("------OBS Batch ref: %ld  ", batch->ref);
         printf("xlen: %4d, ylen: %4d\n", batch->xlen, batch->ylen);
-        tftBatch = (tft_batch_t *)hashLongGetP(tftBatchHash, batch->ref);
-        if(tftBatch == NULL) {
+        item = hashLongGetP(tftBatchHash, batch->ref);
+        if(item == NULL) {
             printf("----NO MATCH TFT\n");
         }
         else {
+            tftBatch = (tft_batch_t *)item->pval;
             tft_batch_active(tftBatch);
             obs_boxes_show(obsBuffer);
         }

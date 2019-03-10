@@ -1,7 +1,7 @@
 DEPLIB = ../build/deps/jansson/lib
 DEPH = ../build/deps/jansson/include
 
-main: tft.c
+main: tft.c simple_hash.c long_hash.c
 	cc -g -L $(DEPLIB) -I . -I $(DEPH) -o main simple_hash.c long_hash.c tft.c -ljansson
 
 	

@@ -22,47 +22,57 @@ hashTab * hashInit(size_t size)
     head = (hashTab *)malloc(sizeof(hashTab));
 	assert(head != NULL);
 	/* pointer table */
-	head->gHashtab = (nlist_t **)malloc(sizeof(nlist_t)*size);
-    memset(head->gHashtab, 0 ,sizeof(nlist_t)*size);
+	head->gHashtab = (hashItem **)malloc(sizeof(hashItem *)*size);
+    memset(head->gHashtab, 0 ,sizeof(hashItem *)*size);
 	head->gHashSize = size;
 	assert(head->gHashtab != NULL);
 	return head;
 }
 
 
-/* hash: form hash value for string s */
-unsigned eval(char *s, size_t size)
+/* hash: form hash value for string key */
+unsigned eval(char *key, size_t size)
 {
     unsigned hindex;
-    for (hindex = 0; *s != '\0'; s++)
-      hindex = *s + 31 * hindex;
+    for (hindex = 0; *key != '\0'; key++)
+      hindex = *key + 31 * hindex;
     return hindex % size;
 }
 
 /* hashGetP: look the pointer val for Hashtab */
-void *hashGetP(hashTab *head, char *s)
+hashItem *hashGetP(hashTab *head, char *key)
 {
-    struct nlist *np;
-    nlist_t **tab = head->gHashtab;
+    hashItem *np;
+    hashItem **tab = head->gHashtab;
     size_t size = head->gHashSize;
-    for (np = tab[eval(s,size)]; np != NULL; np = np->next)
-        if (strcmp(s, np->name) == 0)
-          return np->pval; /* found */
+    for (np = tab[eval(key,size)]; np != NULL; np = np->next)
+        if (strcmp(key, np->key) == 0)
+          return np; /* found */
     return NULL; /* not found */
 }
 
-/* hashSetP: put (name, pval) in Hashtab */
-int hashSetP(hashTab *head, char *name, void *pval)
+/* hashSetP: put (key, pval) in Hashtab */
+int hashSetP(hashTab *head, char *key, void *pval)
 {
-    struct nlist *np;
+    hashItem *np, *tmp;
     unsigned hindex;
-    if ((np = hashGetP(head, name)) == NULL) { /* not found */
-        np = (struct nlist *) malloc(sizeof(*np));
-        if (np == NULL || (np->name = strdup(name)) == NULL)
+    if ((np = hashGetP(head, key)) == NULL) { /* not found */
+        np = (hashItem *) malloc(sizeof(*np));
+        if (np == NULL || (np->key = strdup(key)) == NULL)
           return -ENOMEM;
-        hindex = eval(name, head->gHashSize);
-        np->next = head->gHashtab[hindex];
-        head->gHashtab[hindex] = np;
+        np->next = NULL;
+        np->prev = NULL;
+        hindex = eval(key, head->gHashSize);
+        if(head->gHashtab[hindex] == NULL)
+            head->gHashtab[hindex] = np;
+        else {
+            tmp = head->gHashtab[hindex]->next;
+            head->gHashtab[hindex]->next = np;
+            np->next = tmp;
+            np->prev = head->gHashtab[hindex];
+            if ( tmp != NULL)
+                tmp->prev = np;
+        }
     } 
 	np->pval = pval;
 	return 0;
@@ -72,7 +82,7 @@ int hashSetP(hashTab *head, char *name, void *pval)
 /*
 int hashDelK(hashTab *head, char *key)
 {
-    struct nlist *np;
+    hashItem *np;
     unsigned hindex;
     if ((np = hashGetP(head, key)) == NULL) { 
         return;
@@ -86,42 +96,50 @@ int hashDelK(hashTab *head, char *key)
 
 
 /* hashGetI: look the integer val for Hashtab */
-int hashGetI(hashTab *head, char *s)
+hashItem * hashGetI(hashTab *head, char *key)
 {
-    struct nlist *np;
-    nlist_t **tab = head->gHashtab;
+    hashItem *np;
+    hashItem **tab = head->gHashtab;
     size_t size = head->gHashSize;
-    for (np = tab[eval(s,size)]; np != NULL; np = np->next)
-        if (strcmp(s, np->name) == 0)
-          return np->ival; /* found */
-    return -ENOENT; /* not found */
+    for (np = tab[eval(key,size)]; np != NULL; np = np->next)
+        if (strcmp(key, np->key) == 0)
+          return np; /* found */
+    return NULL; /* not found */
 }
 
-/* hashSetI: put (name, ival) in Hashtab */
-int hashSetI(hashTab *head, char *name, int ival)
+/* hashSetI: put (key, ival) in Hashtab */
+int hashSetI(hashTab *head, char *key, int ival)
 {
-    struct nlist *np;
+    hashItem *np, *tmp;
     unsigned hindex;
-    if ((np = hashGetP(head, name)) == NULL) { /* not found */
-        np = (struct nlist *) malloc(sizeof(*np));
-        if (np == NULL || (np->name = strdup(name)) == NULL)
+    if ((np = hashGetP(head, key)) == NULL) { /* not found */
+        np = (hashItem *) malloc(sizeof(*np));
+        if (np == NULL || (np->key = strdup(key)) == NULL)
           return -ENOMEM;
-        hindex = eval(name, head->gHashSize);
-        np->next = head->gHashtab[hindex];
-        head->gHashtab[hindex] = np;
+        hindex = eval(key, head->gHashSize);
+        if(head->gHashtab[hindex] == NULL)
+            head->gHashtab[hindex] = np;
+        else {
+            tmp = head->gHashtab[hindex]->next;
+            head->gHashtab[hindex]->next = np;
+            np->next = tmp;
+            np->prev = head->gHashtab[hindex];
+            if ( tmp != NULL)
+                tmp->prev = np;
+        }
     } 
 	np->ival = ival;
 	return 0;
 }
 
-/* make a duplicate of s */
+/* make a duplicate of key */
 /*
-char *strdup(char *s) 
+char *strdup(char *key) 
 {
     char *p;
-    p = (char *) malloc(strlen(s)+1);
+    p = (char *) malloc(strlen(key)+1);
     if (p != NULL)
-       strcpy(p, s);
+       strcpy(p, key);
     return p;
 }
 */

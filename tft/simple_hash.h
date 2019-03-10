@@ -7,25 +7,25 @@ leo, lili
 
 #include <stdlib.h>
 
-typedef struct nlist { /* table entry: */
-    struct nlist *next; /* next entry in chain */
-    struct nlist *prev; /* prev entry in chain */
-    char *name; /* key name */
+typedef struct hashItem { /* table entry: */
+    struct hashItem *next; /* next entry in chain */
+    struct hashItem *prev; /* prev entry in chain */
+    char *key; /* key key */
     void *pval; /* pointer val */
     int   ival; /* integer val*/
-}nlist_t;
+}hashItem;
 
 /* table entry: */
 typedef struct hashTab { 
     size_t gHashSize;
-    struct nlist **gHashtab;
+    hashItem **gHashtab;
 }hashTab;
 
 hashTab * hashInit(size_t size);
-void *hashGetP(hashTab *head, char *s);
-int hashSetP(hashTab *head, char *name, void *pval);
-int hashGetI(hashTab *head, char *s);
-int hashSetI(hashTab *head, char *name, int ival);
+hashItem * hashGetP(hashTab *head, char *s);
+int hashSetP(hashTab *head, char *key, void *pval);
+hashItem * hashGetI(hashTab *head, char *s);
+int hashSetI(hashTab *head, char *key, int ival);
 
 
 #endif

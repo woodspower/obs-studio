@@ -22,8 +22,8 @@ hashLongTab * hashLongInit(size_t size)
     head = (hashLongTab *)malloc(sizeof(hashLongTab));
 	assert(head != NULL);
 	/* pointer table */
-	head->gHashtab = (nLongList_t **)malloc(sizeof(nLongList_t)*size);
-    memset(head->gHashtab, 0 ,sizeof(nLongList_t)*size);
+	head->gHashtab = (hashLongItem **)malloc(sizeof(hashLongItem *)*size);
+    memset(head->gHashtab, 0 ,sizeof(hashLongItem*)*size);
 	head->gHashSize = size;
 	assert(head->gHashtab != NULL);
 	return head;
@@ -37,60 +37,81 @@ unsigned longEval(long key, size_t size)
 }
 
 /* hashLongGetP: look the pointer val for Hashtab */
-void *hashLongGetP(hashLongTab *head, long key)
+hashLongItem *hashLongGetP(hashLongTab *head, long key)
 {
-    struct nLongList *np;
-    nLongList_t **tab = head->gHashtab;
+    hashLongItem *np;
+    hashLongItem **tab = head->gHashtab;
     size_t size = head->gHashSize;
     for (np = tab[longEval(key,size)]; np != NULL; np = np->next)
         if (key == np->key)
-          return np->pval; /* found */
+          return np; /* found */
     return NULL; /* not found */
 }
 
 /* hashLongSetP: put (key, pval) in Hashtab */
 int hashLongSetP(hashLongTab *head, long key, void *pval)
 {
-    struct nLongList *np;
+    hashLongItem *np, *tmp;
     unsigned hindex;
     if ((np = hashLongGetP(head, key)) == NULL) { /* not found */
-        np = (struct nLongList *) malloc(sizeof(*np));
+        np = (hashLongItem *) malloc(sizeof(*np));
         if (np == NULL) return -ENOMEM;
         np->key = key;
         hindex = longEval(key, head->gHashSize);
         np->next = head->gHashtab[hindex];
         head->gHashtab[hindex] = np;
+        np->next = NULL;
+        np->prev = NULL;
+        hindex = longEval(key, head->gHashSize);
+        if(head->gHashtab[hindex] == NULL)
+            head->gHashtab[hindex] = np;
+        else {
+            tmp = head->gHashtab[hindex]->next;
+            head->gHashtab[hindex]->next = np;
+            np->next = tmp;
+            np->prev = head->gHashtab[hindex];
+            if ( tmp != NULL)
+                tmp->prev = np;
+        }
     } 
 	np->pval = pval;
 	return 0;
 }
 
+
 /* hashLongGetI: look the integer val for Hashtab */
-int hashLongGetI(hashLongTab *head, long key)
+hashLongItem * hashLongGetI(hashLongTab *head, long key)
 {
-    struct nLongList *np;
-    nLongList_t **tab = head->gHashtab;
+    hashLongItem *np;
+    hashLongItem **tab = head->gHashtab;
     size_t size = head->gHashSize;
     for (np = tab[longEval(key,size)]; np != NULL; np = np->next)
         if (key == np->key)
-          return np->ival; /* found */
-    return -ENOENT; /* not found */
+          return np; /* found */
+    return NULL; /* not found */
 }
 
 /* hashLongSetI: put (key, ival) in Hashtab */
 int hashLongSetI(hashLongTab *head, long key, int ival)
 {
-    struct nLongList *np;
+    hashLongItem *np, *tmp;
     unsigned hindex;
     if ((np = hashLongGetP(head, key)) == NULL) { /* not found */
-        np = (struct nLongList *) malloc(sizeof(*np));
+        np = (hashLongItem *) malloc(sizeof(*np));
         if (np == NULL) return -ENOMEM;
         np->key = key;
         hindex = longEval(key, head->gHashSize);
-        np->next = head->gHashtab[hindex];
-        head->gHashtab[hindex] = np;
+        if(head->gHashtab[hindex] == NULL)
+            head->gHashtab[hindex] = np;
+        else {
+            tmp = head->gHashtab[hindex]->next;
+            head->gHashtab[hindex]->next = np;
+            np->next = tmp;
+            np->prev = head->gHashtab[hindex];
+            if ( tmp != NULL)
+                tmp->prev = np;
+        }
     } 
 	np->ival = ival;
 	return 0;
 }
-
