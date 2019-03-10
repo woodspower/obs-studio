@@ -23,6 +23,7 @@ hashLongTab * hashLongInit(size_t size)
 	assert(head != NULL);
 	/* pointer table */
 	head->gHashtab = (nLongList_t **)malloc(sizeof(nLongList_t)*size);
+    memset(head->gHashtab, 0 ,sizeof(nLongList_t)*size);
 	head->gHashSize = size;
 	assert(head->gHashtab != NULL);
 	return head;

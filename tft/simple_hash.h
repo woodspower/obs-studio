@@ -9,6 +9,7 @@ leo, lili
 
 typedef struct nlist { /* table entry: */
     struct nlist *next; /* next entry in chain */
+    struct nlist *prev; /* prev entry in chain */
     char *name; /* key name */
     void *pval; /* pointer val */
     int   ival; /* integer val*/

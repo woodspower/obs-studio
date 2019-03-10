@@ -372,7 +372,71 @@ void tft_batch_insert(tft_batch_t *old, tft_batch_t *new)
     }
 }
 
-//void tft_subarea_new(tft_batch *batch, char *appName, char *scenceName, char *subareaName, int x1, int x2, int y1, int y2)
+#if 0
+void tft_batch_new(tft_buffer_t *buf, long ref, char *appName, char *scenceName)
+{
+    tft_batch_t *batch;
+    if(buf == NULL || buf->batchHash == NULL || buf->obsBuffer == NULL) {
+        LOGE("ERROR: call tft_batch_new with null buf. \
+              buf=%p, batchHash=%p, obsBuffer=%p\n",\
+              buf, buf->batchHash, buf->obsBuffer);
+        return;
+    }
+
+    /* check exist batch */
+    batch = (tft_batch_t *)hashLongGetP(buf->batchHash, ref);
+    if( batch != NULL) {
+        /* update app area */
+        if (strcmp(appName, batch->appName) != 0) {
+            LOGD("tft_batch_new: update %s-%d with new \
+                app: %s with old app: %s\n",\
+                batch->name, ref, appName, batch->appName);
+            assert(hashSetI(batch->areaHash, batch->appName, 1)>=0);
+            
+
+    batch = (tft_batch_t *)malloc(sizeof(tft_batch_t));
+    batch->prev = batch;
+    batch->next = batch;
+
+    batch->buffer = buf;
+
+
+    /* hash table to avoid name confilt */
+    batch->areaHash = hashInit(TFT_AREA_NUM_MAX);
+    assert(batch->areaHash != NULL);
+
+    assert(json_typeof(unit) == JSON_OBJECT);
+
+    subunit = json_object_get(unit, "ref");
+    assert(json_typeof(subunit) == JSON_INTEGER);
+    batch->ref = json_integer_value(subunit);
+
+    subunit = json_object_get(unit, "app");
+    assert(json_typeof(subunit) == JSON_STRING);
+    batch->appName = strdup(json_string_value(subunit));
+    new = tft_area_alloc(batch->appName, 1, TFT_AREA_TYPE_APP, batch, NULL);
+    /* avoid area name conflict with reserve app name */
+    assert(hashSetI(batch->areaHash, batch->appName, 1)>=0);
+    assert(new != NULL);
+    tft_area_insert(old, new);
+    old = new;
+
+    subunit = json_object_get(unit, "scence");
+    assert(json_typeof(subunit) == JSON_STRING);
+    batch->scenceName = strdup(json_string_value(subunit));
+    new = tft_area_alloc(batch->scenceName, 1, TFT_AREA_TYPE_SCENCE, batch, NULL);
+    /* avoid area name conflict with reserve scence name */
+    assert(hashSetI(batch->areaHash, batch->scenceName, 1)>=0);
+    assert(new != NULL);
+    tft_area_insert(old, new);
+    old = new;
+    
+    batch->areas = old;
+
+
+}
+
+#endif
 
 /* create new subarea in exist tft batch */
 void tft_subarea_new(tft_batch_t *batch, char *name, int x1, int x2, int y1, int y2)

@@ -23,6 +23,7 @@ hashTab * hashInit(size_t size)
 	assert(head != NULL);
 	/* pointer table */
 	head->gHashtab = (nlist_t **)malloc(sizeof(nlist_t)*size);
+    memset(head->gHashtab, 0 ,sizeof(nlist_t)*size);
 	head->gHashSize = size;
 	assert(head->gHashtab != NULL);
 	return head;
@@ -66,6 +67,23 @@ int hashSetP(hashTab *head, char *name, void *pval)
 	np->pval = pval;
 	return 0;
 }
+
+/* hashDelK: put (key, pval) in Hashtab */
+/*
+int hashDelK(hashTab *head, char *key)
+{
+    struct nlist *np;
+    unsigned hindex;
+    if ((np = hashGetP(head, key)) == NULL) { 
+        return;
+    } 
+    
+	np->pval = pval;
+	return 0;
+}
+
+*/
+
 
 /* hashGetI: look the integer val for Hashtab */
 int hashGetI(hashTab *head, char *s)
