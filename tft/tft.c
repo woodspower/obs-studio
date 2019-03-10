@@ -372,6 +372,54 @@ void tft_batch_insert(tft_batch_t *old, tft_batch_t *new)
     }
 }
 
+//void tft_subarea_new(tft_batch *batch, char *appName, char *scenceName, char *subareaName, int x1, int x2, int y1, int y2)
+
+/* create new subarea in exist tft batch */
+void tft_subarea_new(tft_batch_t *batch, char *name, int x1, int x2, int y1, int y2)
+{
+    int seq;
+    tft_area_t *subarea;
+    if(batch == NULL || batch->appName == NULL || batch->scenceName == NULL \
+        || batch->areaHash == NULL ) {
+        LOGE("ERROR: call tft_area_new with null batch. \
+              batch=%p, batch.appName=%s, batch.scenceName=%s, areaHash=%p\n",\
+              batch, batch->appName, batch->scenceName, batch->areaHash);
+        return;
+    }
+
+    LOGD("tft_subarea_new in batch ref:%ld\n", batch->ref);
+
+    /* seq areas with same name */
+    seq = hashGetI(batch->areaHash, name);
+    LOGD("hashGetI(%s)=%d\n",name,seq);
+    if(seq <= 0) seq = 1;
+    else seq += 1;
+    assert(hashSetI(batch->areaHash, name, seq)>=0);
+    subarea = tft_area_alloc(name, seq, TFT_AREA_TYPE_SUBAREA, batch, NULL);
+    subarea->xmin = x1;
+    subarea->ymin = y1;
+    subarea->xmax = x2;
+    subarea->ymax = y2;
+    if(batch->areas == NULL) {
+        tft_area_insert(NULL, subarea);
+        batch->areas = subarea;
+    }
+    else tft_area_insert(batch->areas, subarea);
+}
+
+/* update exist tft batch */
+void tft_subarea_update(tft_area_t *subarea, int x1, int x2, int y1, int y2)
+{
+    if(subarea == NULL) {
+        LOGE("tft_subarea_update called with NULL subarea param\n");
+        return;
+    }
+    subarea->xmin = x1;
+    subarea->ymin = y1;
+    subarea->xmax = x2;
+    subarea->ymax = y2;
+}
+
 
 tft_batch_t * tft_batch_load(json_t *unit, tft_buffer_t *buffer)
 {
@@ -420,6 +468,9 @@ tft_batch_t * tft_batch_load(json_t *unit, tft_buffer_t *buffer)
     assert(new != NULL);
     tft_area_insert(old, new);
     old = new;
+    
+    tmp->areas = old;
+
 
     subunit = json_object_get(unit, "subareas");
     assert(json_typeof(subunit) == JSON_ARRAY);
@@ -430,80 +481,23 @@ tft_batch_t * tft_batch_load(json_t *unit, tft_buffer_t *buffer)
         key = json_object_get(aunit, "type");
         assert(json_typeof(key) == JSON_STRING);
         name = json_string_value(key);
-        /* seq areas with same name */
-        seq = hashGetI(tmp->areaHash, name);
-        LOGD("1.hashGetI(%s)=%d\n",name,seq);
-        if(seq <= 0) seq = 1;
-        else seq += 1;
-        assert(hashSetI(tmp->areaHash, name, seq)>=0);
-        new = tft_area_alloc(name, seq, TFT_AREA_TYPE_SUBAREA, tmp, NULL);
+
         key = json_object_get(aunit, "xmin");
         assert(json_typeof(key) == JSON_INTEGER);
-        new->xmin = (unsigned)json_integer_value(key);
+        x1 = (unsigned)json_integer_value(key);
         key = json_object_get(aunit, "ymin");
         assert(json_typeof(key) == JSON_INTEGER);
-        new->ymin = (unsigned)json_integer_value(key);
+        y1 = (unsigned)json_integer_value(key);
         key = json_object_get(aunit, "xmax");
         assert(json_typeof(key) == JSON_INTEGER);
-        new->xmax = (unsigned)json_integer_value(key);
+        x2 = (unsigned)json_integer_value(key);
         key = json_object_get(aunit, "ymax");
         assert(json_typeof(key) == JSON_INTEGER);
-        new->ymax = (unsigned)json_integer_value(key);
-
-        tft_area_insert(old, new);
-        old = new;
+        y2 = (unsigned)json_integer_value(key);
+        
+        tft_subarea_new(tmp, name, x1, x2, y1, y2);
     }
-    tmp->areas = old;
     return tmp;
-}
-
-//void tft_subarea_new(tft_batch *batch, char *appName, char *scenceName, char *subareaName, int x1, int x2, int y1, int y2)
-
-/* create new subarea in exist tft batch */
-void tft_subarea_new(tft_batch *batch, char *name, int x1, int x2, int y1, int y2)
-{
-    int i;
-    tft_area_t *old=NULL, *new=NULL;
-    json_t *subunit, *aunit, *key;
-    char *name;
-    int seq;
-
-    if(batch == NULL || batch->appName == NULL || batch->scenceName == NULL \
-        || batch->areaHash == NULL ) {
-        LOGE("ERROR: call tft_area_new with null batch. \
-              batch=%p, batch.appName=%s, batch.scenceName=%s, areaHash=%p\n",\
-              batch, batch->appName, batch->scenceName, batch->areaHash);
-        return;
-    }
-
-    LOGD("tft_subarea_new in batch ref:%l\n", batch->ref);
-
-    /* seq areas with same name */
-    seq = hashGetI(batch->areaHash, name);
-    LOGD("hashGetI(%s)=%d\n",name,seq);
-    if(seq <= 0) seq = 1;
-    else seq += 1;
-    assert(hashSetI(batch->areaHash, name, seq)>=0);
-    subarea = tft_area_alloc(name, seq, TFT_AREA_TYPE_SUBAREA, batch, NULL);
-    subarea->xmin = x1;
-    subarea->ymin = y1;
-    subarea->xmax = x2;
-    subarea->ymax = y2;
-    if(batch->areas == NULL) batch->areas = subarea;
-    else tft_area_insert(batch->areas, subarea);
-}
-
-/* update exist tft batch */
-void tft_subarea_update(tft_subarea_t *subarea, int x1, int x2, int y1, int y2)
-{
-    if(subarea == NULL) {
-        LOGE("tft_subarea_update called with NULL subarea param\n");
-        return;
-    }
-    subarea->xmin = x1;
-    subarea->ymin = y1;
-    subarea->xmax = x2;
-    subarea->ymax = y2;
 }
 
 void tft_batch_active(tft_batch_t *batch)
