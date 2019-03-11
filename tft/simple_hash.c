@@ -79,20 +79,27 @@ int hashSetP(hashTab *head, char *key, void *pval)
 }
 
 /* hashDelK: put (key, pval) in Hashtab */
-/*
-int hashDelK(hashTab *head, char *key)
+void hashDelK(hashTab *head, char *key)
 {
-    hashItem *np;
+    hashItem *np, *tmpNext, *tmpPrev;
     unsigned hindex;
     if ((np = hashGetP(head, key)) == NULL) { 
         return;
     } 
-    
-	np->pval = pval;
-	return 0;
+
+    hindex = eval(key, head->gHashSize);
+    tmpPrev = np->prev;
+    tmpNext = np->next;
+
+    /* If it is the only item */
+    if(tmpPrev == np) head->gHashtab[hindex] = NULL;
+    else {
+        tmpPrev->next = tmpNext;
+        tmpNext->prev = tmpPrev;
+    }
+    free(np);
 }
 
-*/
 
 
 /* hashGetI: look the integer val for Hashtab */
