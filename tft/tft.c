@@ -269,7 +269,7 @@ void tft_area_associate(tft_area_t *new)
     char * key;
 
     if(obsBuffer == NULL) {
-        LOGE("tft_area_disassociate called but obsBuffer is NULL.\n");
+        LOGE("tft_area_associate called but obsBuffer is NULL.\n");
         return;
     }
 
@@ -308,7 +308,6 @@ void tft_area_associate(tft_area_t *new)
 }
 
 #if 0
-
 /* tft area disassocate with obs box */
 void tft_area_disassociate(tft_area_t *item)
 {
@@ -319,7 +318,7 @@ void tft_area_disassociate(tft_area_t *item)
     char * key;
 
     if(obsBuffer == NULL) {
-        LOGE("tft_area_disassociate called but obsBuffer is NULL.\n");
+        LOGE("tft_area_disdisassociate called but obsBuffer is NULL.\n");
         return;
     }
 
@@ -327,62 +326,18 @@ void tft_area_disassociate(tft_area_t *item)
     assert(boxHash != NULL);
     key = tft_new_name(item->name, item->seq);
 
-    /* check if associate existing box */
-    if(item->box != NULL) {
-        if(strcmp(key, item->box->name)!=0) {
-            LOGE("call tft_area_associate with error params. area name(%s) \
+    /* check if disassociate existing box */
+    if(item->box != NULL) 
+        if(strcmp(key, item->box->name)!=0) 
+            /* continue even name is not correct */
+            LOGE("call tft_area_disassociate with error params. area name(%s) \
                   should equal box name(%s)\n", key, item->box->name);
-            return;
-        }
-    }
 
-    item = hashGetP(boxHash, key);
-    if (item != NULL) {
-        assert(item->pval != NULL);
-        box = (obs_box_t *)item->pval;
-    }
-    else {
-        /* check if associate existing box */
-        if(item->box != NULL) box=item->box;
-        else box = obs_box_alloc(key);
-        /* insert box into hash table */
-        hashSetP(boxHash, key, (void*)box);
-        /* insert box into obsBuffer->boxes link */
-        if(obsBuffer->boxes == NULL) obsBuffer->boxes = box;
-        else obs_box_insert(obsBuffer->boxes, box);   
-    }
-    /* avoid memory leak */
-    free(key);
-    /* link box into tft_area_t */
-    item->box = box;
+    /* unlink box with tft_area_t */
+    item->box = NULL;
 }
-
-
-void tft_area_remove(tft_area_t *item)
-{
-    tft_batch_t *batch;
-    tft_area_t *tmpNext, *tmpPrev;
-    if(item == NULL) {
-        LOGE("tft_area_remove called with NULL item\n");
-        return;
-    }
-    batch = item->batch;
-    tmpNext = item->next;
-    tmpPrev = item->prev;
-    
-    /* if it is the last item */
-    if(tmpNext == item)
-        batch->areas = NULL;
-    else {
-        tmpPrev->next = tmpNext;
-        tmpNext->prev = tmpPrev;
-    }
-    /* remove item link info */
-    item->next = NULL;
-    item->prev = NULL;
-}
-
 #endif
+
 
 void tft_area_insert(tft_area_t *old, tft_area_t *new)
 {
@@ -403,58 +358,152 @@ void tft_area_insert(tft_area_t *old, tft_area_t *new)
     }
 }
 
-#if 0
 void tft_area_free(tft_area_t *item)
 {
     tft_batch_t *batch;
+    tft_area_t *tmpNext, *tmpPrev;
+
     if(item == NULL) {
         LOGE("tft_area_free called with NULL item\n");
         return;
     }
-    if(item->next != NULL || item->prev != NULL) {
-        LOGE("tft_area_free item linker is not NULL\n");
-        return;
-    }
     batch = item->batch;
+    tmpNext = item->next;
+    tmpPrev = item->prev;
 
+    /* if it is the last item */
+    if(tmpNext == item)
+        batch->areas = NULL;
+    else {
+        tmpPrev->next = tmpNext;
+        tmpNext->prev = tmpPrev;
+    }
+
+    /* if it is the batch->areas itself */
+    if(batch->areas == item)
+        batch->areas = tmpNext;
+        
+    /* remove item link info */
+    item->next = NULL;
+    item->prev = NULL;
+
+    /* do not need to call disassociate and direct free */
+    // tft_area_disassociate(item);
+    free(item);
 }
 
-#endif
-
-tft_area_t * tft_area_alloc(char *name, int seq, enum tft_area_enum type, tft_batch_t *batch, obs_box_t *box)
+tft_area_t * tft_area_alloc(tft_batch_t *batch, char *name, enum tft_area_enum type, int x1, int y1, int x2, int y2)
 {
     tft_area_t *tmp;
+    hashItem *item;
+
     tmp = (tft_area_t *)malloc(sizeof(tft_area_t));
     tmp->atype = type;
     tmp->name = strdup(name);
-    tmp->seq = seq;
     tmp->batch = batch;
     tmp->prev = tmp;
     tmp->next = tmp;
     tmp->last = NULL;
     tmp->box  = NULL;
-    tmp->xmin = 0;
-    tmp->ymin = 0;
-    tmp->xmax = 0;
-    tmp->ymax = 0;
+    tmp->xmin = x1;
+    tmp->ymin = y1;
+    tmp->xmax = x2;
+    tmp->ymax = y2;
 
-    char *key = tft_new_name(name, seq);
+    /* add counter hash for same name */
+    item = hashGetI(batch->areaHash, name);
+    if (item != NULL) tmp->seq = item->ival + 1;
+    else tmp->seq = 1;
+    LOGD("hashGetI(%s)=%d\n",name,tmp->seq);
+    assert(hashSetI(batch->areaHash, name, tmp->seq)>=0);
 
-    /* if associate existing box */
-    if(box != NULL) {
-        if(strcmp(key, box->name)!=0)
-            LOGE("call tft_area_associate with error params. area name(%s) \
-                  should equal box name(%s)\n", key, box->name);
-        else
-            tmp->box = box;
+    /* add into batch->areas linker */
+    if(batch->areas == NULL) {
+        tft_area_insert(NULL, tmp);
+        batch->areas = tmp;
     }
+    else tft_area_insert(batch->areas, tmp);
 
-    /* avoid mem leak */
-    free(key);
     /* associate tft area with obs box */
     tft_area_associate(tmp);
 
     return tmp;
+}
+
+
+void tft_area_delete(tft_area_t *area)
+{
+    tft_batch_t *batch = area->batch; 
+
+    if(batch == NULL || batch->areaHash == NULL || area == NULL) {
+        LOGE("ERROR: call tft_area_delete with null param. \
+              batch=%p, areaHash=%p, area=%p\n",\
+              batch, batch->areaHash, area);
+        return;
+    }
+
+    LOGD("tft_area_delete in batch ref=%ld with name=%s, type=%d\n",
+          batch->ref, area->name, area->atype);
+
+    if(area->atype == TFT_AREA_TYPE_APP) {
+        LOGD("tft_area_delete delete app area: %s\n", area->name);
+        /* only remove app area and scence area counter */
+        hashDelK(batch->areaHash, area->name);
+        batch->appArea = NULL;
+    }
+
+    if(area->atype == TFT_AREA_TYPE_SCENCE) {
+        LOGD("tft_area_delete delete scence area: %s\n", area->name);
+        /* only remove app area and scence area counter */
+        hashDelK(batch->areaHash, area->name);
+        batch->scenceArea = NULL;
+    }
+
+    /* do NOT remove subarea counter to avoid conflict */
+    // hashDelK(batch->areaHash, area->name);
+
+    /* remove form batch->areas linker and free */
+    tft_area_free(area);
+}
+
+
+/* create new subarea in exist tft batch */
+tft_area_t * tft_area_new(tft_batch_t *batch, enum tft_area_enum type, char *name, int x1, int y1, int x2, int y2)
+{
+    tft_area_t *area;
+    if(batch == NULL || batch->areaHash == NULL ) {
+        LOGE("ERROR: call tft_area_new with null batch. \
+              batch=%p, areaHash=%p\n",\
+              batch, batch->areaHash);
+        return NULL;
+    }
+
+    LOGD("tft_area_new in batch ref=%ld with name=%s, \
+          batch.app=%p, batch.scence=%p, areaHash=%p\n",\
+          batch->ref, name, batch->appArea, batch->scenceArea, batch->areaHash);
+
+    area = tft_area_alloc(batch, name, type, x1,y1,x2,y2);
+    /* update batch app or scence area pointer */
+    if (area != NULL) {
+        if (type == TFT_AREA_TYPE_APP)
+            batch->appArea = area;
+        else if (type == TFT_AREA_TYPE_SCENCE)
+            batch->scenceArea = area;
+    }
+    return area;
+}
+
+/* update exist tft batch */
+void tft_area_update(tft_area_t *area, int x1, int y1, int x2, int y2)
+{
+    if(area == NULL) {
+        LOGE("tft_area_update called with NULL area param\n");
+        return;
+    }
+    area->xmin = x1;
+    area->ymin = y1;
+    area->xmax = x2;
+    area->ymax = y2;
 }
 
 void tft_batch_insert(tft_batch_t *old, tft_batch_t *new)
@@ -476,207 +525,67 @@ void tft_batch_insert(tft_batch_t *old, tft_batch_t *new)
     }
 }
 
-
-#if 0
-
-void tft_batch_update(tft_buffer_t *buf, long ref, char *appName, char *scenceName)
+tft_batch_t * tft_batch_alloc(tft_buffer_t *buf, long ref)
 {
-    tft_batch_t *batch;
-    hashLongItem *item;
-    if(buf == NULL || buf->batchHash == NULL || buf->obsBuffer == NULL) {
-        LOGE("ERROR: call tft_batch_new with null buf. \
-              buf=%p, batchHash=%p, obsBuffer=%p\n",\
-              buf, buf->batchHash, buf->obsBuffer);
-        return;
-    }
+    tft_batch_t *tmp;
+    char *name;
 
-    /* check exist batch */
-    item = hashLongGetP(buf->batchHash, ref);
-    if( item != NULL) {
-        batch = item->pval;
-        assert(batch != NULL);
-        /* update app area */
-        if (strcmp(appName, batch->appName) != 0) {
-            LOGD("tft_batch_new: update %s-%d with new \
-                app: %s with old app: %s\n",\
-                batch->name, ref, appName, batch->appName);
-            hashDelK(batch->areaHash, batch->appName);
-            tft_area_delete(batch->appName);
-            
-
-            hashSetI(batch->areaHash, batch->appName, 1);
-            
-
-    batch = (tft_batch_t *)malloc(sizeof(tft_batch_t));
-    batch->prev = batch;
-    batch->next = batch;
-
-    batch->buffer = buf;
-
-
-    /* hash table to avoid name confilt */
-    batch->areaHash = hashInit(TFT_AREA_NUM_MAX);
-    assert(batch->areaHash != NULL);
-
-    assert(json_typeof(unit) == JSON_OBJECT);
-
-    subunit = json_object_get(unit, "ref");
-    assert(json_typeof(subunit) == JSON_INTEGER);
-    batch->ref = json_integer_value(subunit);
-
-    subunit = json_object_get(unit, "app");
-    assert(json_typeof(subunit) == JSON_STRING);
-    batch->appName = strdup(json_string_value(subunit));
-    new = tft_area_alloc(batch->appName, 1, TFT_AREA_TYPE_APP, batch, NULL);
-    /* avoid area name conflict with reserve app name */
-    assert(hashSetI(batch->areaHash, batch->appName, 1)>=0);
-    assert(new != NULL);
-    tft_area_insert(old, new);
-    old = new;
-
-    subunit = json_object_get(unit, "scence");
-    assert(json_typeof(subunit) == JSON_STRING);
-    batch->scenceName = strdup(json_string_value(subunit));
-    new = tft_area_alloc(batch->scenceName, 1, TFT_AREA_TYPE_SCENCE, batch, NULL);
-    /* avoid area name conflict with reserve scence name */
-    assert(hashSetI(batch->areaHash, batch->scenceName, 1)>=0);
-    assert(new != NULL);
-    tft_area_insert(old, new);
-    old = new;
-    
-    batch->areas = old;
-
-
-}
-
-
-void tft_area_delete(tft_batch_t *batch, tft_area_t *area)
-{
-    hashItem *item;
-    if(batch == NULL || batch->areaHash == NULL || area == NULL) {
-        LOGE("ERROR: call tft_area_delete with null param. \
-              batch=%p, areaHash=%p, area=%p\n",\
-              batch, batch->areaHash, area);
-        return;
-    }
-
-    LOGD("tft_area_delete in batch ref=%ld with name=%s, type=%d\n",
-          batch->ref, area->name, area->atype);
-
-    if(area->atype == TFT_AREA_TYPE_APP) {
-        LOGD("tft_area_delete delete app area: %s\n", area->name);
-        
-
-
-    /* seq areas with same name */
-    area = tft_area_alloc(name, seq, type, batch, NULL);
-    area->xmin = x1;
-    area->ymin = y1;
-    area->xmax = x2;
-    area->ymax = y2;
-    if(batch->areas == NULL) {
-        tft_area_insert(NULL, area);
-        batch->areas = area;
-    }
-    else tft_area_insert(batch->areas, area);
-
-
-
-}
-
-#endif
-
-/* create new subarea in exist tft batch */
-tft_area_t * tft_area_new(tft_batch_t *batch, enum tft_area_enum type, char *name, int x1, int y1, int x2, int y2)
-{
-    int seq = 0;
-    tft_area_t *area;
-    hashItem *item;
-    if(batch == NULL || batch->areaHash == NULL ) {
-        LOGE("ERROR: call tft_area_new with null batch. \
-              batch=%p, areaHash=%p\n",\
-              batch, batch->areaHash);
+    if (buf == NULL) {
+        LOGE("ERROR: call tft_batch_alloc with null buf.\n");
         return NULL;
     }
 
-    LOGD("tft_area_new in batch ref=%ld with name=%s, \
-          batch.app.name=%s, batch.scence.name=%s, areaHash=%p\n",\
-          batch->ref, name, batch->appArea->name, batch->scenceArea->name, batch->areaHash);
+    tmp = (tft_batch_t *)malloc(sizeof(tft_batch_t));
+    if (tmp != NULL) {
+        tmp->prev = tmp;
+        tmp->next = tmp;
+        tmp->areas = NULL;
+        tmp->buffer = buf;
+        tmp->ref = ref;
+        tmp->appArea = NULL;
+        tmp->scenceArea = NULL;
+        /* create area hashtab inside batch */
+        tmp->areaHash = hashInit(TFT_AREA_NUM_MAX);
+        assert(tmp->areaHash != NULL);
 
-    /* seq areas with same name */
-    item = hashGetI(batch->areaHash, name);
-    if (item != NULL) seq = item->ival + 1;
-    else seq = 1;
-    LOGD("hashGetI(%s)=%d\n",name,seq);
-    assert(hashSetI(batch->areaHash, name, seq)>=0);
-    area = tft_area_alloc(name, seq, type, batch, NULL);
-    area->xmin = x1;
-    area->ymin = y1;
-    area->xmax = x2;
-    area->ymax = y2;
-    if(batch->areas == NULL) {
-        tft_area_insert(NULL, area);
-        batch->areas = area;
+        /* insert into linker and hashtab */
+        tft_batch_insert(buf->batchs, tmp);
+        hashLongSetP(buf->batchHash, ref, (void*)tmp);
     }
-    else tft_area_insert(batch->areas, area);
-
-    return area;
+    return tmp;
 }
-
-/* update exist tft batch */
-void tft_subarea_update(tft_area_t *subarea, int x1, int y1, int x2, int y2)
-{
-    if(subarea == NULL) {
-        LOGE("tft_subarea_update called with NULL subarea param\n");
-        return;
-    }
-    subarea->xmin = x1;
-    subarea->ymin = y1;
-    subarea->xmax = x2;
-    subarea->ymax = y2;
-}
-
 
 tft_batch_t * tft_batch_load(json_t *unit, tft_buffer_t *buffer)
 {
     int i;
-    static long ref = 1;
+    long ref = 1;
     tft_batch_t *tmp;
-    tft_area_t *new=NULL;
     json_t *subunit, *aunit, *key;
     char *name;
     int seq;
     int x1,y1,x2,y2;
 
-    tmp = (tft_batch_t *)malloc(sizeof(tft_batch_t));
-    tmp->prev = tmp;
-    tmp->next = tmp;
-    tmp->areas = NULL;
-
-    assert(buffer != NULL);
-    tmp->buffer = buffer;
-
-    /* hash table to avoid name confilt */
-    tmp->areaHash = hashInit(TFT_AREA_NUM_MAX);
-    assert(tmp->areaHash != NULL);
 
     assert(json_typeof(unit) == JSON_OBJECT);
-
     subunit = json_object_get(unit, "ref");
     assert(json_typeof(subunit) == JSON_INTEGER);
-    tmp->ref = json_integer_value(subunit);
+    ref = json_integer_value(subunit);
+
+    tmp = tft_batch_alloc(buffer, ref);
+    if (tmp == NULL) {
+        LOGE("tft_batch_load: out of memory.\n");
+        return NULL;
+    }
 
     subunit = json_object_get(unit, "app");
     assert(json_typeof(subunit) == JSON_STRING);
     name = (char *)json_string_value(subunit);
-    new = tft_area_new(tmp, TFT_AREA_TYPE_APP, name, 0,0,0,0);
-    tmp->appArea = new;
+    tft_area_new(tmp, TFT_AREA_TYPE_APP, name, 0,0,0,0);
 
     subunit = json_object_get(unit, "scence");
     assert(json_typeof(subunit) == JSON_STRING);
     name = (char *)json_string_value(subunit);
-    new = tft_area_new(tmp, TFT_AREA_TYPE_SCENCE, name, 0,0,0,0);
-    tmp->scenceArea = new;
+    tft_area_new(tmp, TFT_AREA_TYPE_SCENCE, name, 0,0,0,0);
 
     subunit = json_object_get(unit, "subareas");
     assert(json_typeof(subunit) == JSON_ARRAY);
@@ -704,6 +613,68 @@ tft_batch_t * tft_batch_load(json_t *unit, tft_buffer_t *buffer)
         tft_area_new(tmp, TFT_AREA_TYPE_SUBAREA, name, x1, y1, x2, y2);
     }
     return tmp;
+}
+
+
+/* update appArea or scenceArea */
+void tft_batch_update(tft_buffer_t *buf, long ref, char *appName, char *scenceName)
+{
+    tft_batch_t *batch;
+    hashLongItem *item;
+    if (buf == NULL || buf->batchHash == NULL || buf->obsBuffer == NULL) {
+        LOGE("ERROR: call tft_batch_new with null buf. \
+              buf=%p, batchHash=%p, obsBuffer=%p\n",\
+              buf, buf->batchHash, buf->obsBuffer);
+        return;
+    }
+
+    item = hashLongGetP(buf->batchHash, ref);
+    /* create new batch */
+    if (item == NULL) {
+        LOGD("tft_batch_update: new batch with ref:%ld with app: %s\n", ref, appName);
+        batch = tft_batch_alloc(buf, ref);
+        if (batch == NULL) {
+            LOGE("tft_batch_update: out of memory.\n");
+            return;
+        }
+        if (appName != NULL) 
+            tft_area_new(batch, TFT_AREA_TYPE_APP, appName, 0,0,0,0);
+        if (scenceName != NULL)
+            tft_area_new(batch, TFT_AREA_TYPE_SCENCE, scenceName, 0,0,0,0);
+    }
+    /* update exist batch */
+    else {
+        batch = item->pval;
+        assert(batch != NULL);
+        /* update app area */
+        if (appName != NULL) {
+            if (batch->appArea == NULL) {
+                LOGD("tft_batch_update: update %ld with new \
+                    app: %s from old NULL app\n", ref, appName);
+                tft_area_new(batch, TFT_AREA_TYPE_APP, appName, 0,0,0,0);
+            }
+            else if (strcmp(appName, batch->appArea->name) != 0) {
+                LOGD("tft_batch_update: update %ld with new \
+                    app: %s from old app: %s\n", ref, appName, batch->appArea->name);
+                tft_area_delete(batch->appArea);
+                tft_area_new(batch, TFT_AREA_TYPE_APP, appName, 0,0,0,0);
+            }
+        }
+        /* update scence area */
+        else if (scenceName != NULL) {
+            if (batch->scenceArea == NULL) {
+                LOGD("tft_batch_update: update %ld with new \
+                    scence: %s from old NULL scence\n", ref, scenceName);
+                tft_area_new(batch, TFT_AREA_TYPE_SCENCE, scenceName, 0,0,0,0);
+            }
+            else if (strcmp(scenceName, batch->scenceArea->name) != 0) {
+                LOGD("tft_batch_update: update %ld with new \
+                    scence: %s from old scence: %s\n", ref, scenceName, batch->scenceArea->name);
+                tft_area_delete(batch->scenceArea);
+                tft_area_new(batch, TFT_AREA_TYPE_SCENCE, scenceName, 0,0,0,0);
+            }
+        }
+    }
 }
 
 void tft_batch_active(tft_batch_t *batch)
@@ -734,7 +705,7 @@ tft_buffer_t * tft_buffer_load(json_t *root, obs_buffer_t *obsBuffer)
 {
     int i;
     struct tft_buffer *buffer;
-    tft_batch_t *old, *new;
+    tft_batch_t *new;
     const char *key;
     json_t *unit, *subunit;
     char *name;
@@ -757,16 +728,15 @@ tft_buffer_t * tft_buffer_load(json_t *root, obs_buffer_t *obsBuffer)
     unit = json_object_get(root, "batchs");
     assert(json_typeof(unit) == JSON_ARRAY);
 
-    old = NULL;
     for(i=0; i<json_array_size(unit); i++)
     {
         new = tft_batch_load(json_array_get(unit, i), buffer);
-        assert(new != NULL);
-        hashLongSetP(buffer->batchHash, new->ref, (void*)new);
-        tft_batch_insert(old, new);
-        old = new;
+        if (new == NULL) {
+            LOGE("tft_buffer_load: out of memory.\n");
+            return NULL;
+        }
     }
-    buffer->batchs = old;
+    buffer->batchs = new;
     return buffer;
 }
 
@@ -874,26 +844,30 @@ void test_run(tft_buffer_t *tftBuffer)
         return;
     }
 
-    printf("*************Run obs Buffer: %s ***************\n", obsBuffer->name);
-    batch0 = obsBuffer->batchs;
-    batch = batch0;
-    do {
-        obs_buffer_reset(obsBuffer);
-        assert(batch != NULL);
-        printf("------OBS Batch ref: %ld  ", batch->ref);
-        printf("xlen: %4d, ylen: %4d\n", batch->xlen, batch->ylen);
-        item = hashLongGetP(tftBatchHash, batch->ref);
-        if(item == NULL) {
-            printf("----NO MATCH TFT\n");
-        }
-        else {
-            tftBatch = (tft_batch_t *)item->pval;
-            tft_batch_active(tftBatch);
-            obs_boxes_show(obsBuffer);
-        }
-        sleep(1);
-        batch = batch->next;
-    }while(batch != batch0);
+    for (int i=0; i<3; i++) {
+        printf("*************Run obs Buffer: %s ***************\n", obsBuffer->name);
+        batch0 = obsBuffer->batchs;
+        batch = batch0;
+        do {
+            obs_buffer_reset(obsBuffer);
+            assert(batch != NULL);
+            printf("------OBS Batch ref: %ld  ", batch->ref);
+            printf("xlen: %4d, ylen: %4d\n", batch->xlen, batch->ylen);
+            item = hashLongGetP(tftBatchHash, batch->ref);
+            if(item == NULL) {
+                printf("----NO MATCH TFT\n");
+            }
+            else {
+                tftBatch = (tft_batch_t *)item->pval;
+                tft_batch_active(tftBatch);
+                obs_boxes_show(obsBuffer);
+            }
+            sleep(1);
+            batch = batch->next;
+            /* test tft update */
+        }while(batch != batch0);
+        tft_batch_update(tftBuffer, 20190302153001, "newgggcode", NULL);
+    }
 }
 
 

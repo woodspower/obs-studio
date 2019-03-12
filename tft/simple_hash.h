@@ -26,6 +26,7 @@ hashItem * hashGetP(hashTab *head, char *s);
 int hashSetP(hashTab *head, char *key, void *pval);
 hashItem * hashGetI(hashTab *head, char *s);
 int hashSetI(hashTab *head, char *key, int ival);
+void hashDelK(hashTab *head, char *key);
 
 
 #endif
