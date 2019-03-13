@@ -17,6 +17,7 @@ leo, lili
 */
 
 #include <string.h>
+#include <stdlib.h>
 #include <jansson.h>
 #include <assert.h>
 #include "simple_hash.h"
@@ -122,8 +123,6 @@ void obs_box_insert(obs_box_t *old, obs_box_t *new)
     obs_box_t *tmpnext;
     assert(new != NULL);
     if(old == NULL) {
-        old->next = old;
-        old->prev = old;
         return; 
     }
     tmpnext = old->next;
@@ -549,7 +548,8 @@ tft_batch_t * tft_batch_alloc(tft_buffer_t *buf, long ref)
         assert(tmp->areaHash != NULL);
 
         /* insert into linker and hashtab */
-        tft_batch_insert(buf->batchs, tmp);
+        if (buf->batchs == NULL) buf->batchs = tmp;
+        else tft_batch_insert(buf->batchs, tmp);
         hashLongSetP(buf->batchHash, ref, (void*)tmp);
     }
     return tmp;
@@ -718,8 +718,9 @@ tft_buffer_t * tft_buffer_load(json_t *root, obs_buffer_t *obsBuffer)
     assert(buffer != NULL);
     buffer->obsBuffer = obsBuffer;
 
-    /* init batchHash */
+    /* init batchHash and batchLinker */
     buffer->batchHash = hashLongInit(TFT_BATCH_NUM_MAX);
+    buffer->batchs = NULL;
     
     unit = json_object_get(root, "name");
     assert(json_typeof(unit) == JSON_STRING);
@@ -727,6 +728,7 @@ tft_buffer_t * tft_buffer_load(json_t *root, obs_buffer_t *obsBuffer)
 
     unit = json_object_get(root, "batchs");
     assert(json_typeof(unit) == JSON_ARRAY);
+
 
     for(i=0; i<json_array_size(unit); i++)
     {
@@ -736,7 +738,6 @@ tft_buffer_t * tft_buffer_load(json_t *root, obs_buffer_t *obsBuffer)
             return NULL;
         }
     }
-    buffer->batchs = new;
     return buffer;
 }
 
@@ -867,6 +868,8 @@ void test_run(tft_buffer_t *tftBuffer)
             /* test tft update */
         }while(batch != batch0);
         tft_batch_update(tftBuffer, 20190302153001, "newgggcode", NULL);
+        //tft_batch_update(tftBuffer, 20190302153002, "pigie", NULL);
+        //tft_batch_update(tftBuffer, 20190302153003, NULL, "red");
     }
 }
 

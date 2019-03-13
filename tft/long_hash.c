@@ -29,6 +29,26 @@ hashLongTab * hashLongInit(size_t size)
 	return head;
 }
 
+/* insert new into a bi-direction linker */
+void hashLongInsert(hashLongItem *old, hashLongItem *new)
+{
+    hashLongItem *tmpnext;
+    assert(new != NULL);
+    if(old == NULL)
+        return; 
+    tmpnext = old->next;
+    old->next = new;
+    new->prev = old;
+    if(tmpnext == old) {
+        old->prev = new;
+        new->next = old;
+    }
+    else {
+        tmpnext->prev = new;
+        new->next = tmpnext;
+    }
+}
+
 
 /* hash: form hash value for long key */
 unsigned longEval(long key, size_t size)
@@ -39,12 +59,17 @@ unsigned longEval(long key, size_t size)
 /* hashLongGetP: look the pointer val for Hashtab */
 hashLongItem *hashLongGetP(hashLongTab *head, long key)
 {
-    hashLongItem *np;
+    hashLongItem *np, *np0;
     hashLongItem **tab = head->gHashtab;
     size_t size = head->gHashSize;
-    for (np = tab[longEval(key,size)]; np != NULL; np = np->next)
+    np = tab[longEval(key,size)];
+    if (np == NULL) return NULL;
+    np0 = np;
+    do {
         if (key == np->key)
           return np; /* found */
+        np = np->next;
+    }while(np != np0);
     return NULL; /* not found */
 }
 
@@ -57,22 +82,13 @@ int hashLongSetP(hashLongTab *head, long key, void *pval)
         np = (hashLongItem *) malloc(sizeof(*np));
         if (np == NULL) return -ENOMEM;
         np->key = key;
+        np->next = np;
+        np->prev = np;
         hindex = longEval(key, head->gHashSize);
-        np->next = head->gHashtab[hindex];
-        head->gHashtab[hindex] = np;
-        np->next = NULL;
-        np->prev = NULL;
-        hindex = longEval(key, head->gHashSize);
+        /* insert new into a bi-direction linker */
         if(head->gHashtab[hindex] == NULL)
             head->gHashtab[hindex] = np;
-        else {
-            tmp = head->gHashtab[hindex]->next;
-            head->gHashtab[hindex]->next = np;
-            np->next = tmp;
-            np->prev = head->gHashtab[hindex];
-            if ( tmp != NULL)
-                tmp->prev = np;
-        }
+        else hashLongInsert(head->gHashtab[hindex], np);
     } 
 	np->pval = pval;
 	return 0;
@@ -82,12 +98,17 @@ int hashLongSetP(hashLongTab *head, long key, void *pval)
 /* hashLongGetI: look the integer val for Hashtab */
 hashLongItem * hashLongGetI(hashLongTab *head, long key)
 {
-    hashLongItem *np;
+    hashLongItem *np, *np0;
     hashLongItem **tab = head->gHashtab;
     size_t size = head->gHashSize;
-    for (np = tab[longEval(key,size)]; np != NULL; np = np->next)
+    np = tab[longEval(key,size)];
+    if ( np == NULL ) return NULL;
+    np0 = np;
+    do {
         if (key == np->key)
           return np; /* found */
+        np = np->next;
+    }while(np != np0);
     return NULL; /* not found */
 }
 
@@ -100,17 +121,13 @@ int hashLongSetI(hashLongTab *head, long key, int ival)
         np = (hashLongItem *) malloc(sizeof(*np));
         if (np == NULL) return -ENOMEM;
         np->key = key;
+        np->next = np;
+        np->prev = np;
         hindex = longEval(key, head->gHashSize);
+        /* insert new into a bi-direction linker */
         if(head->gHashtab[hindex] == NULL)
             head->gHashtab[hindex] = np;
-        else {
-            tmp = head->gHashtab[hindex]->next;
-            head->gHashtab[hindex]->next = np;
-            np->next = tmp;
-            np->prev = head->gHashtab[hindex];
-            if ( tmp != NULL)
-                tmp->prev = np;
-        }
+        else hashLongInsert(head->gHashtab[hindex], np);
     } 
 	np->ival = ival;
 	return 0;

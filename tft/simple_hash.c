@@ -30,6 +30,26 @@ hashTab * hashInit(size_t size)
 }
 
 
+/* insert new into a bi-direction linker */
+void hashInsert(hashItem *old, hashItem *new)
+{
+    hashItem *tmpnext;
+    assert(new != NULL);
+    if(old == NULL)
+        return; 
+    tmpnext = old->next;
+    old->next = new;
+    new->prev = old;
+    if(tmpnext == old) {
+        old->prev = new;
+        new->next = old;
+    }
+    else {
+        tmpnext->prev = new;
+        new->next = tmpnext;
+    }
+}
+
 /* hash: form hash value for string key */
 unsigned eval(char *key, size_t size)
 {
@@ -42,12 +62,17 @@ unsigned eval(char *key, size_t size)
 /* hashGetP: look the pointer val for Hashtab */
 hashItem *hashGetP(hashTab *head, char *key)
 {
-    hashItem *np;
+    hashItem *np, *np0;
     hashItem **tab = head->gHashtab;
     size_t size = head->gHashSize;
-    for (np = tab[eval(key,size)]; np != NULL; np = np->next)
+    np = tab[eval(key,size)];
+    if (np == NULL) return NULL;
+    np0 = np;
+    do {
         if (strcmp(key, np->key) == 0)
           return np; /* found */
+        np = np->next;
+    }while(np != np0);
     return NULL; /* not found */
 }
 
@@ -60,19 +85,13 @@ int hashSetP(hashTab *head, char *key, void *pval)
         np = (hashItem *) malloc(sizeof(*np));
         if (np == NULL || (np->key = strdup(key)) == NULL)
           return -ENOMEM;
-        np->next = NULL;
-        np->prev = NULL;
+        np->next = np;
+        np->prev = np;
         hindex = eval(key, head->gHashSize);
+        /* insert new into a bi-direction linker */
         if(head->gHashtab[hindex] == NULL)
             head->gHashtab[hindex] = np;
-        else {
-            tmp = head->gHashtab[hindex]->next;
-            head->gHashtab[hindex]->next = np;
-            np->next = tmp;
-            np->prev = head->gHashtab[hindex];
-            if ( tmp != NULL)
-                tmp->prev = np;
-        }
+        else hashInsert(head->gHashtab[hindex], np);
     } 
 	np->pval = pval;
 	return 0;
@@ -83,20 +102,30 @@ void hashDelK(hashTab *head, char *key)
 {
     hashItem *np, *tmpNext, *tmpPrev;
     unsigned hindex;
-    if ((np = hashGetP(head, key)) == NULL) { 
+    np = hashGetP(head, key);
+    if (np == NULL)
         return;
-    } 
 
     hindex = eval(key, head->gHashSize);
     tmpPrev = np->prev;
     tmpNext = np->next;
 
-    /* If it is the only item */
-    if(tmpPrev == np) head->gHashtab[hindex] = NULL;
+    /* if it is the last item */
+    if(tmpNext == np) 
+        head->gHashtab[hindex] = NULL;
     else {
         tmpPrev->next = tmpNext;
         tmpNext->prev = tmpPrev;
     }
+
+    /* if it is the head->gHashtab[] itself */
+    if(head->gHashtab[hindex] == np)
+        head->gHashtab[hindex] = tmpNext;
+        
+    /* remove np link info */
+    np->next = NULL;
+    np->prev = NULL;
+
     free(np);
 }
 
@@ -105,12 +134,17 @@ void hashDelK(hashTab *head, char *key)
 /* hashGetI: look the integer val for Hashtab */
 hashItem * hashGetI(hashTab *head, char *key)
 {
-    hashItem *np;
+    hashItem *np, *np0;
     hashItem **tab = head->gHashtab;
     size_t size = head->gHashSize;
-    for (np = tab[eval(key,size)]; np != NULL; np = np->next)
+    np = tab[eval(key,size)];
+    if (np == NULL) return NULL;
+    np0 = np;
+    do {
         if (strcmp(key, np->key) == 0)
           return np; /* found */
+        np = np->next;
+    }while(np != np0);
     return NULL; /* not found */
 }
 
@@ -123,17 +157,13 @@ int hashSetI(hashTab *head, char *key, int ival)
         np = (hashItem *) malloc(sizeof(*np));
         if (np == NULL || (np->key = strdup(key)) == NULL)
           return -ENOMEM;
+        np->next = np;
+        np->prev = np;
         hindex = eval(key, head->gHashSize);
+        /* insert new into a bi-direction linker */
         if(head->gHashtab[hindex] == NULL)
             head->gHashtab[hindex] = np;
-        else {
-            tmp = head->gHashtab[hindex]->next;
-            head->gHashtab[hindex]->next = np;
-            np->next = tmp;
-            np->prev = head->gHashtab[hindex];
-            if ( tmp != NULL)
-                tmp->prev = np;
-        }
+        else hashInsert(head->gHashtab[hindex], np);
     } 
 	np->ival = ival;
 	return 0;
