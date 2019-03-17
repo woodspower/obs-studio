@@ -13,7 +13,7 @@ leo, lili
 #include "long_hash.h"
 
 /* max 10000 boxes in one obs buffer */
-#define OBS_BOX_NUM_MAX  10000
+#define TFT_BOX_NUM_MAX  10000
 /* max 10000 batchs in one tft buffer */
 #define TFT_BATCH_NUM_MAX 10000
 /* max 1000 areas in one tft batch */
@@ -23,17 +23,18 @@ leo, lili
 
 
 
-typedef struct obs_box {
+typedef struct tft_box {
 	char *name;
     void *handle;
     /* if==1 ON, if==0 OFF */
     int  status;
-	struct obs_box *prev;
-	struct obs_box *next;
+	struct tft_box *prev;
+	struct tft_box *next;
     /* current active tft area */
     struct tft_area *area;
-}obs_box_t;
+}tft_box_t;
 
+#if 0
 typedef struct obs_batch {
 	volatile long ref;
 	struct obs_batch *prev;
@@ -45,9 +46,8 @@ typedef struct obs_batch {
 typedef struct obs_buffer {
 	char *name;
 	struct obs_batch *batchs;
-    obs_box_t *boxes;
-	hashTab *boxHash;
 }obs_buffer_t;
+#endif
 
 enum tft_area_enum {
 	TFT_AREA_TYPE_APP,
@@ -66,7 +66,7 @@ typedef struct tft_area {
 	struct tft_area *prev;
 	struct tft_area *next;
     struct tft_batch *batch;
-    obs_box_t *box;
+    tft_box_t *box;
 	unsigned xmin;
 	unsigned ymin;
 	unsigned xmax;
@@ -86,9 +86,10 @@ typedef struct tft_batch {
 
 typedef struct tft_buffer {
 	char *name;
-    obs_buffer_t *obsBuffer;
 	struct tft_batch *batchs;
     hashLongTab *batchHash;
+    tft_box_t *boxes;
+	hashTab *boxHash;
 }tft_buffer_t;
 
 #endif

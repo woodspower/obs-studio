@@ -12,6 +12,38 @@ leo, lili
 #define LOGI(FORMAT, args...)   printf(FORMAT, ##args)
 #define LOGE(FORMAT, args...)   printf(FORMAT, ##args)
 
+#if 0
+/* tft area disassocate with obs box */
+void tft_area_disassociate(tft_area_t *item)
+{
+    obs_buffer_t *obsBuffer = item->batch->buffer->obsBuffer;
+    hashTab *boxHash;
+    hashItem *item;
+    obs_box_t *box;
+    char * key;
+
+    if(obsBuffer == NULL) {
+        LOGE("tft_area_disdisassociate called but obsBuffer is NULL.\n");
+        return;
+    }
+
+    boxHash = obsBuffer->boxHash;
+    assert(boxHash != NULL);
+    key = tft_new_name(item->name, item->seq);
+
+    /* check if disassociate existing box */
+    if(item->box != NULL) 
+        if(strcmp(key, item->box->name)!=0) 
+            /* continue even name is not correct */
+            LOGE("call tft_area_disassociate with error params. area name(%s) \
+                  should equal box name(%s)\n", key, item->box->name);
+
+    /* unlink box with tft_area_t */
+    item->box = NULL;
+}
+#endif
+
+
 /* insert new into a bi-direction linker */
 void obs_box_insert(obs_box_t *old, obs_box_t *new)
 {

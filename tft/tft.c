@@ -31,9 +31,9 @@ leo, lili
 
 
 /* insert new into a bi-direction linker */
-void obs_box_insert(obs_box_t *old, obs_box_t *new)
+void tft_box_insert(tft_box_t *old, tft_box_t *new)
 {
-    obs_box_t *tmpnext;
+    tft_box_t *tmpnext;
     assert(new != NULL);
     if(old == NULL) {
         return; 
@@ -51,9 +51,9 @@ void obs_box_insert(obs_box_t *old, obs_box_t *new)
     }
 }
 
-obs_box_t * obs_box_alloc(char *name)
+tft_box_t * tft_box_alloc(char *name)
 {
-    obs_box_t *box = (obs_box_t *)malloc(sizeof(obs_box_t));
+    tft_box_t *box = (tft_box_t *)malloc(sizeof(tft_box_t));
     box->name = strdup(name);
     box->status = 0;
     box->prev = box;
@@ -63,6 +63,7 @@ obs_box_t * obs_box_alloc(char *name)
     return box;
 }
 
+#if 0
 void obs_batch_insert(obs_batch_t *old, obs_batch_t *new)
 {
     obs_batch_t *tmpnext;
@@ -104,7 +105,6 @@ obs_buffer_t * obs_buffer_load(void)
     buffer = (obs_buffer_t*)malloc(sizeof(obs_buffer_t));
     assert(buffer != NULL);
     buffer->name = strdup(TEST_BUFFER_NAME);
-    buffer->boxes = NULL;
     old = NULL;
 
     for(i=0; i<TEST_BUFFER_BATCH_NUM; i++)
@@ -114,8 +114,6 @@ obs_buffer_t * obs_buffer_load(void)
         old = new;
     }
     buffer->batchs = old;
-    /* init code boxHash */
-    buffer->boxHash = hashInit(OBS_BOX_NUM_MAX);
     
     return buffer;
 }
@@ -125,9 +123,11 @@ void obs_buffer_free(obs_buffer_t *buffer)
     return;
 }
 
-void obs_buffer_reset(obs_buffer_t *buf)
+#endif
+
+void tft_box_reset(tft_buffer_t *buf)
 {
-    obs_box_t *box, *box0;
+    tft_box_t *box, *box0;
 
     if(buf == NULL) return;
 
@@ -140,10 +140,10 @@ void obs_buffer_reset(obs_buffer_t *buf)
     }while(box != box0);
 }
 
-void obs_boxes_show(obs_buffer_t *buf)
+void tft_box_show(tft_buffer_t *buf)
 {
     char * name;
-    obs_box_t *box, *box0;
+    tft_box_t *box, *box0;
     tft_area_t *area;
 
     if(buf == NULL) return;
@@ -152,7 +152,7 @@ void obs_boxes_show(obs_buffer_t *buf)
     box = box0;
     do {
         if(box == NULL) {
-            LOGD("obs_boxes_show: NO box now.\n");
+            LOGD("tft_box_show: NO box now.\n");
             return;
         }
         if(box->status == 1) {
@@ -179,18 +179,18 @@ char * tft_new_name(char *name, int seq)
 /* tft area assocate with obs box */
 void tft_area_associate(tft_area_t *new)
 {
-    obs_buffer_t *obsBuffer = new->batch->buffer->obsBuffer;
+    tft_buffer_t *tftBuffer = new->batch->buffer;
     hashTab *boxHash;
     hashItem *item;
-    obs_box_t *box;
+    tft_box_t *box;
     char * key;
 
-    if(obsBuffer == NULL) {
-        LOGE("tft_area_associate called but obsBuffer is NULL.\n");
+    if(tftBuffer == NULL) {
+        LOGE("tft_area_associate called but tftBuffer is NULL.\n");
         return;
     }
 
-    boxHash = obsBuffer->boxHash;
+    boxHash = tftBuffer->boxHash;
     assert(boxHash != NULL);
     key = tft_new_name(new->name, new->seq);
 
@@ -206,55 +206,23 @@ void tft_area_associate(tft_area_t *new)
     item = hashGetP(boxHash, key);
     if (item != NULL) {
         assert(item->pval != NULL);
-        box = (obs_box_t *)item->pval;
+        box = (tft_box_t *)item->pval;
     }
     else {
         /* check if associate existing box */
         if(new->box != NULL) box=new->box;
-        else box = obs_box_alloc(key);
+        else box = tft_box_alloc(key);
         /* insert box into hash table */
         hashSetP(boxHash, key, (void*)box);
-        /* insert box into obsBuffer->boxes link */
-        if(obsBuffer->boxes == NULL) obsBuffer->boxes = box;
-        else obs_box_insert(obsBuffer->boxes, box);   
+        /* insert box into tftBuffer->boxes link */
+        if(tftBuffer->boxes == NULL) tftBuffer->boxes = box;
+        else tft_box_insert(tftBuffer->boxes, box);   
     }
     /* avoid memory leak */
     free(key);
     /* link box into tft_area_t */
     new->box = box;
 }
-
-#if 0
-/* tft area disassocate with obs box */
-void tft_area_disassociate(tft_area_t *item)
-{
-    obs_buffer_t *obsBuffer = item->batch->buffer->obsBuffer;
-    hashTab *boxHash;
-    hashItem *item;
-    obs_box_t *box;
-    char * key;
-
-    if(obsBuffer == NULL) {
-        LOGE("tft_area_disdisassociate called but obsBuffer is NULL.\n");
-        return;
-    }
-
-    boxHash = obsBuffer->boxHash;
-    assert(boxHash != NULL);
-    key = tft_new_name(item->name, item->seq);
-
-    /* check if disassociate existing box */
-    if(item->box != NULL) 
-        if(strcmp(key, item->box->name)!=0) 
-            /* continue even name is not correct */
-            LOGE("call tft_area_disassociate with error params. area name(%s) \
-                  should equal box name(%s)\n", key, item->box->name);
-
-    /* unlink box with tft_area_t */
-    item->box = NULL;
-}
-#endif
-
 
 void tft_area_insert(tft_area_t *old, tft_area_t *new)
 {
@@ -351,6 +319,8 @@ tft_area_t * tft_area_alloc(tft_batch_t *batch, char *name, enum tft_area_enum t
 
 void tft_area_delete(tft_area_t *area)
 {
+    if (area == NULL)
+        return;
     tft_batch_t *batch = area->batch; 
 
     if(batch == NULL || batch->areaHash == NULL || area == NULL) {
@@ -540,10 +510,10 @@ tft_batch_t * tft_batch_update(tft_buffer_t *buf, long ref, char *appName, char 
 {
     tft_batch_t *batch;
     hashLongItem *item;
-    if (buf == NULL || buf->batchHash == NULL || buf->obsBuffer == NULL) {
+    if (buf == NULL || buf->batchHash == NULL) {
         LOGE("ERROR: call tft_batch_new with null buf. \
-              buf=%p, batchHash=%p, obsBuffer=%p\n",\
-              buf, buf->batchHash, buf->obsBuffer);
+              buf=%p, batchHash=%p \n",\
+              buf, buf->batchHash);
         return NULL;
     }
 
@@ -598,24 +568,21 @@ tft_batch_t * tft_batch_update(tft_buffer_t *buf, long ref, char *appName, char 
     return batch;
 }
 
-void obs_batch_active(tft_buffer_t *tftBuffer, long ref)
+void tft_box_active(tft_buffer_t *tftBuffer, long ref)
 {
     tft_area_t *area, *area0;
-    obs_box_t *box;
+    tft_box_t *box;
     hashLongItem *item;
     tft_batch_t *tftBatch;
     hashLongTab *tftBatchHash;
-    obs_buffer_t *obsBuffer;
 
-    assert(tftBuffer != NULL);
-    obsBuffer = tftBuffer->obsBuffer;
-    if(obsBuffer == NULL) {
-        LOGE("OBS BUFFER is empty.\n");
+    if(tftBuffer == NULL) {
+        LOGE("TFT BUFFER is empty.\n");
         return;
     }
 
-    obs_buffer_reset(obsBuffer);
-    LOGI("------OBS Batch ref: %ld  ", ref);
+    tft_box_reset(tftBuffer);
+    LOGI("------TFT Batch ref: %ld  \n", ref);
     tftBatchHash = tftBuffer->batchHash;
     item = hashLongGetP(tftBatchHash, ref);
     if(item == NULL) {
@@ -626,13 +593,16 @@ void obs_batch_active(tft_buffer_t *tftBuffer, long ref)
 
     area0 = tftBatch->areas;
     area = area0;
+    if(area == NULL) {
+        LOGD("tft_box_active called with NULL area\n");
+        return;
+    }
     do {
-        assert(area != NULL);
         /* try associate dynamic */
         if (area->box == NULL)
             tft_area_associate(area);
         if (area->box == NULL) {
-            LOGD("obs_batch_active failed for area: %s, seq: %d \n",
+            LOGD("tft_box_active failed for area: %s, seq: %d \n",
                 area->name, area->seq);
             continue;
         }
@@ -644,22 +614,27 @@ void obs_batch_active(tft_buffer_t *tftBuffer, long ref)
     }while(area != area0);
 }
 
-tft_buffer_t * tft_buffer_load(json_t *root, obs_buffer_t *obsBuffer)
+tft_buffer_t * tft_buffer_load(const char *jsonfile)
 {
     int i;
     struct tft_buffer *buffer;
     tft_batch_t *new;
     const char *key;
     json_t *unit, *subunit;
+    json_t *root;
+    json_error_t error;
     char *name;
 
-    assert(root != NULL);
-    assert(obsBuffer != NULL);
+    /* load ai result from json file */
+    root = json_load_file(jsonfile, 0, &error);
+    if(root == NULL) {
+        fprintf(stderr, "Error MSG: %s\n", error.text);
+        return NULL;
+    }
 
     assert(json_typeof(root) == JSON_OBJECT);
     buffer = (tft_buffer_t*)malloc(sizeof(tft_buffer_t));
     assert(buffer != NULL);
-    buffer->obsBuffer = obsBuffer;
 
     /* init batchHash and batchLinker */
     buffer->batchHash = hashLongInit(TFT_BATCH_NUM_MAX);
@@ -672,6 +647,9 @@ tft_buffer_t * tft_buffer_load(json_t *root, obs_buffer_t *obsBuffer)
     unit = json_object_get(root, "batchs");
     assert(json_typeof(unit) == JSON_ARRAY);
 
+    /* init code boxHash */
+    buffer->boxes = NULL;
+    buffer->boxHash = hashInit(TFT_BOX_NUM_MAX);
 
     for(i=0; i<json_array_size(unit); i++)
     {
@@ -681,10 +659,11 @@ tft_buffer_t * tft_buffer_load(json_t *root, obs_buffer_t *obsBuffer)
             return NULL;
         }
     }
+    json_decref(root);
     return buffer;
 }
 
-void tft_buffer_free(obs_buffer_t *buffer)
+void tft_buffer_free(tft_buffer_t *buffer)
 {
     return;
 }
@@ -703,15 +682,14 @@ tf_tag_batch * tf_tag_load(json_t *root)
         print_json_aux(value, indent + 2);
     }
 */
-#define TEST_AI_CONFIG_JSON "./main.json"
 
-
+#if 0
 
 void obs_buffer_print(obs_buffer_t *buf)
 {
     char * name;
     obs_batch_t *batch, *batch0;
-    obs_box_t *box, *box0;
+    tft_box_t *box, *box0;
     if(buf == NULL) {
         LOGE("OBS BUFFER is empty.\n");
         return;
@@ -737,6 +715,7 @@ void obs_buffer_print(obs_buffer_t *buf)
     }while(box != box0);
 }
 
+#endif
 
 void tft_buffer_print(tft_buffer_t *buf)
 {
@@ -773,35 +752,24 @@ void tft_buffer_print(tft_buffer_t *buf)
 
 void test_run(tft_buffer_t *tftBuffer)
 {
-    obs_buffer_t *obsBuffer;
-    obs_batch_t *batch, *batch0;
     tft_batch_t *tftBatch;
 
-    obsBuffer = tftBuffer->obsBuffer;
-    if(obsBuffer == NULL) {
-        LOGE("OBS BUFFER is empty.\n");
-        return;
-    }
-
     for (int i=0; i<3; i++) {
-        LOGI("*************Run obs Buffer: %s ***************\n", obsBuffer->name);
-        batch0 = obsBuffer->batchs;
-        batch = batch0;
-        do {
-            obs_batch_active(tftBuffer, batch->ref);
-            obs_boxes_show(obsBuffer);
+        LOGI("*************Run obs Buffer***************\n");
+        for (long ref=2018030602102; ref<2018030602199; ref+=10) {
+            tft_box_active(tftBuffer, ref);
+            tft_box_show(tftBuffer);
             sleep(1);
-            batch = batch->next;
-            /* test tft update */
-        }while(batch != batch0);
-        tftBatch = tft_batch_update(tftBuffer, 20190302153001, "newgggcode", NULL);
-        if(tftBatch != NULL)
-            tft_area_delete(tftBatch->appArea);
+        }
+        /* test tft update */
+        tftBatch = tft_batch_update(tftBuffer, 2018030602102, "newgggcode", NULL);
         tft_batch_update(tftBuffer, 20190302153002, "pigie", NULL);
         tftBatch = tft_batch_update(tftBuffer, 20190302153003, NULL, "red");
         if(tftBatch != NULL)
             tft_area_new(tftBatch, TFT_AREA_TYPE_SUBAREA, "i like coding", 99,99,999,999);
         tftBatch = tft_batch_update(tftBuffer, 20190302153004, NULL, NULL);
+        if(tftBatch != NULL)
+            tft_area_delete(tftBatch->appArea);
         if(tftBatch != NULL)
             tft_area_new(tftBatch, TFT_AREA_TYPE_SUBAREA, "what is this code", 99,99,999,999);
     }
@@ -809,10 +777,7 @@ void test_run(tft_buffer_t *tftBuffer)
 
 
 int main(int argc, char *argv[]) {
-    obs_buffer_t *obsBuffer;
     tft_buffer_t *tftBuffer;
-    json_t *root;
-    json_error_t error;
 
     if (argc != 1) {
         fprintf(stderr, "Usage: %s\n", argv[0]);
@@ -820,23 +785,16 @@ int main(int argc, char *argv[]) {
     }
 
     /* init a demo buffer */
-    obsBuffer = obs_buffer_load();
+//    obsBuffer = obs_buffer_load();
 
-    /* load ai result from json file */
-    root = json_load_file(TEST_AI_CONFIG_JSON, 0, &error);
-    if(root == NULL) {
-        fprintf(stderr, "Error MSG: %s\n", error.text);
-        exit(-1);
-    }
 
-    tftBuffer = tft_buffer_load(root, obsBuffer);
+    tftBuffer = tft_buffer_load("./main.json");
     
-    obs_buffer_print(obsBuffer);
+//    obs_buffer_print(obsBuffer);
     tft_buffer_print(tftBuffer);
 
     test_run(tftBuffer);
     
-    json_decref(root);
 
     return 0;
 }
