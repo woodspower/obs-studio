@@ -16,105 +16,18 @@ leo, lili
 #include "obs-data.h"
 */
 
-#include <string.h>
-#include <stdlib.h>
 #include <jansson.h>
-#include <assert.h>
-#include "simple_hash.h"
-#include "long_hash.h"
+#include "tft.h"
 
-#include <unistd.h>
 
 #define LOGD(FORMAT, args...)   printf(FORMAT, ##args)
 #define LOGI(FORMAT, args...)   printf(FORMAT, ##args)
 #define LOGE(FORMAT, args...)   printf(FORMAT, ##args)
 
-
-/* max 10000 boxes in one obs buffer */
-#define OBS_BOX_NUM_MAX  10000
-/* max 10000 batchs in one tft buffer */
-#define TFT_BATCH_NUM_MAX 10000
-/* max 1000 areas in one tft batch */
-#define TFT_AREA_NUM_MAX  1000
-/* name string should not longer than 128 char */
-#define TFT_NAME_LEN_MAX  128
-
-
 /* TEST marcro */
 #define TEST_BUFFER_BATCH_NUM 10
 #define TEST_BUFFER_SOURCE_NUM 5
 #define TEST_BUFFER_NAME "qj-2288-01"
-
-typedef struct obs_box {
-	char *name;
-    void *handle;
-    /* if==1 ON, if==0 OFF */
-    int  status;
-	struct obs_box *prev;
-	struct obs_box *next;
-	unsigned xmin;
-	unsigned ymin;
-	unsigned xmax;
-	unsigned ymax;
-}obs_box_t;
-
-typedef struct obs_batch {
-	volatile long ref;
-	struct obs_batch *prev;
-	struct obs_batch *next;
-	unsigned int xlen;
-	unsigned int ylen;
-}obs_batch_t;
-
-typedef struct obs_buffer {
-	char *name;
-	struct obs_batch *batchs;
-    obs_box_t *boxes;
-	hashTab *boxHash;
-}obs_buffer_t;
-
-enum tft_area_enum {
-	TFT_AREA_TYPE_APP,
-	TFT_AREA_TYPE_SCENCE,
-	TFT_AREA_TYPE_SUBAREA
-};
-
-
-typedef struct tft_area {
-	enum tft_area_enum atype;
-	char *name;
-    /* instance number of same name */
-    int seq;
-    /* find the last one which have same name */
-	struct tft_area *last;
-	struct tft_area *prev;
-	struct tft_area *next;
-    struct tft_batch *batch;
-    obs_box_t *box;
-	unsigned xmin;
-	unsigned ymin;
-	unsigned xmax;
-	unsigned ymax;
-}tft_area_t;
-
-typedef struct tft_batch {
-	volatile long ref;
-    tft_area_t *appArea;
-    tft_area_t *scenceArea;
-	struct tft_batch *prev;
-	struct tft_batch *next;
-    struct tft_buffer *buffer;
-	hashTab *areaHash;
-	tft_area_t *areas;
-}tft_batch_t;
-
-typedef struct tft_buffer {
-	char *name;
-    obs_buffer_t *obsBuffer;
-	struct tft_batch *batchs;
-    hashLongTab *batchHash;
-}tft_buffer_t;
-
 
 
 /* insert new into a bi-direction linker */
@@ -145,10 +58,8 @@ obs_box_t * obs_box_alloc(char *name)
     box->status = 0;
     box->prev = box;
     box->next = box;
-    box->xmin = 0;
-    box->ymin = 0;
-    box->xmax = 0;
-    box->ymax = 0;
+    box->area = NULL;
+    box->handle = NULL;
     return box;
 }
 
@@ -233,16 +144,23 @@ void obs_boxes_show(obs_buffer_t *buf)
 {
     char * name;
     obs_box_t *box, *box0;
+    tft_area_t *area;
 
     if(buf == NULL) return;
 
     box0 = buf->boxes;
     box = box0;
     do {
-        assert(box != NULL);
+        if(box == NULL) {
+            LOGD("obs_boxes_show: NO box now.\n");
+            return;
+        }
         if(box->status == 1) {
-            printf("------Box name: %s\n", box->name);
-            printf("(xmin,ymin,xmax,ymax): (%d,%d,%d,%d)\n",box->xmin,box->ymin,box->xmax,box->ymax);
+            LOGI("------Box name: %s\n", box->name);
+            area = box->area;
+            assert (area != NULL);
+            LOGI("type:%d (xmin,ymin,xmax,ymax): (%d,%d,%d,%d)\n",
+            area->atype, area->xmin,area->ymin,area->xmax,area->ymax);
         }
         box = box->next;
     }while(box != box0);
@@ -423,8 +341,9 @@ tft_area_t * tft_area_alloc(tft_batch_t *batch, char *name, enum tft_area_enum t
     }
     else tft_area_insert(batch->areas, tmp);
 
-    /* associate tft area with obs box */
-    tft_area_associate(tmp);
+    /* pre-associate tft area with obs box */
+    // LEO: close it for debugging
+    // tft_area_associate(tmp);
 
     return tmp;
 }
@@ -617,7 +536,7 @@ tft_batch_t * tft_batch_load(json_t *unit, tft_buffer_t *buffer)
 
 
 /* update appArea or scenceArea */
-void tft_batch_update(tft_buffer_t *buf, long ref, char *appName, char *scenceName)
+tft_batch_t * tft_batch_update(tft_buffer_t *buf, long ref, char *appName, char *scenceName)
 {
     tft_batch_t *batch;
     hashLongItem *item;
@@ -625,7 +544,7 @@ void tft_batch_update(tft_buffer_t *buf, long ref, char *appName, char *scenceNa
         LOGE("ERROR: call tft_batch_new with null buf. \
               buf=%p, batchHash=%p, obsBuffer=%p\n",\
               buf, buf->batchHash, buf->obsBuffer);
-        return;
+        return NULL;
     }
 
     item = hashLongGetP(buf->batchHash, ref);
@@ -635,7 +554,7 @@ void tft_batch_update(tft_buffer_t *buf, long ref, char *appName, char *scenceNa
         batch = tft_batch_alloc(buf, ref);
         if (batch == NULL) {
             LOGE("tft_batch_update: out of memory.\n");
-            return;
+            return NULL;
         }
         if (appName != NULL) 
             tft_area_new(batch, TFT_AREA_TYPE_APP, appName, 0,0,0,0);
@@ -675,27 +594,51 @@ void tft_batch_update(tft_buffer_t *buf, long ref, char *appName, char *scenceNa
             }
         }
     }
+    
+    return batch;
 }
 
-void tft_batch_active(tft_batch_t *batch)
+void obs_batch_active(tft_buffer_t *tftBuffer, long ref)
 {
     tft_area_t *area, *area0;
     obs_box_t *box;
+    hashLongItem *item;
+    tft_batch_t *tftBatch;
+    hashLongTab *tftBatchHash;
+    obs_buffer_t *obsBuffer;
 
-    if(batch == NULL) return;
+    assert(tftBuffer != NULL);
+    obsBuffer = tftBuffer->obsBuffer;
+    if(obsBuffer == NULL) {
+        LOGE("OBS BUFFER is empty.\n");
+        return;
+    }
 
-    area0 = batch->areas;
+    obs_buffer_reset(obsBuffer);
+    LOGI("------OBS Batch ref: %ld  ", ref);
+    tftBatchHash = tftBuffer->batchHash;
+    item = hashLongGetP(tftBatchHash, ref);
+    if(item == NULL) {
+        LOGI("----NO MATCH TFT\n");
+        return;
+    }
+    tftBatch = (tft_batch_t *)item->pval;
+
+    area0 = tftBatch->areas;
     area = area0;
     do {
         assert(area != NULL);
+        /* try associate dynamic */
+        if (area->box == NULL)
+            tft_area_associate(area);
+        if (area->box == NULL) {
+            LOGD("obs_batch_active failed for area: %s, seq: %d \n",
+                area->name, area->seq);
+            continue;
+        }
         box = area->box;
-        assert(box != NULL);
-
         box->status = 1;
-        box->xmin = area->xmin;
-        box->ymin = area->ymin;
-        box->xmax = area->xmax;
-        box->ymax = area->ymax;
+        box->area = area;
 
         area = area->next;
     }while(area != area0);
@@ -770,27 +713,26 @@ void obs_buffer_print(obs_buffer_t *buf)
     obs_batch_t *batch, *batch0;
     obs_box_t *box, *box0;
     if(buf == NULL) {
-        printf("OBS BUFFER is empty.\n");
+        LOGE("OBS BUFFER is empty.\n");
         return;
     }
 
     name = buf->name;
-    printf("*************OBS Buffer: %s ***************\n", name);
+    LOGI("*************OBS Buffer: %s ***************\n", name);
     batch0 = buf->batchs;
     batch = batch0;
     do {
         assert(batch != NULL);
-        printf("------Batch ref: %ld\n", batch->ref);
-        printf("xlen: %4d, ylen: %4d\n", batch->xlen, batch->ylen);
+        LOGI("------Batch ref: %ld\n", batch->ref);
+        LOGI("xlen: %4d, ylen: %4d\n", batch->xlen, batch->ylen);
         batch = batch->next;
     }while(batch != batch0);
 
     box0 = buf->boxes;
     box = box0;
     do {
-        assert(box != NULL);
-        printf("------Box name: %s\n", box->name);
-        printf("(xmin,ymin,xmax,ymax): (%d,%d,%d,%d)\n",box->xmin,box->ymin,box->xmax,box->ymax);
+        if (box == NULL) continue;
+        LOGI("------Box name: %s\n", box->name);
         box = box->next;
     }while(box != box0);
 }
@@ -807,20 +749,20 @@ void tft_buffer_print(tft_buffer_t *buf)
     }
 
     name = buf->name;
-    printf("*************TFT Buffer: %s ***************\n", name);
+    LOGI("*************TFT Buffer: %s ***************\n", name);
     batch0 = buf->batchs;
     batch = batch0;
     do {
         assert(batch != NULL);
-        printf("------Batch ref: %ld\n", batch->ref);
-        printf("------app.scence: %s.%s\n", batch->appArea->name, batch->scenceArea->name);
+        LOGI("------Batch ref: %ld\n", batch->ref);
+        LOGI("------app.scence: %s.%s\n", batch->appArea->name, batch->scenceArea->name);
 
         area0 = batch->areas;
         area = area0;
         do {
             assert(area != NULL);
-            printf("----area name: type[%d]-%s-seq[%d]\n", area->atype, area->name, area->seq);
-            printf("(xmin,ymin,xmax,ymax): (%d,%d,%d,%d)\n",area->xmin,area->ymin,area->xmax,area->ymax);
+            LOGI("----area name: type[%d]-%s-seq[%d]\n", area->atype, area->name, area->seq);
+            LOGI("(xmin,ymin,xmax,ymax): (%d,%d,%d,%d)\n",area->xmin,area->ymin,area->xmax,area->ymax);
             area = area->next;
         }while(area != area0);
 
@@ -833,43 +775,35 @@ void test_run(tft_buffer_t *tftBuffer)
 {
     obs_buffer_t *obsBuffer;
     obs_batch_t *batch, *batch0;
-    obs_box_t *box, *box0;
-    hashLongTab *tftBatchHash;
-    hashLongItem *item;
     tft_batch_t *tftBatch;
 
     obsBuffer = tftBuffer->obsBuffer;
-    tftBatchHash = tftBuffer->batchHash;
     if(obsBuffer == NULL) {
-        printf("OBS BUFFER is empty.\n");
+        LOGE("OBS BUFFER is empty.\n");
         return;
     }
 
     for (int i=0; i<3; i++) {
-        printf("*************Run obs Buffer: %s ***************\n", obsBuffer->name);
+        LOGI("*************Run obs Buffer: %s ***************\n", obsBuffer->name);
         batch0 = obsBuffer->batchs;
         batch = batch0;
         do {
-            obs_buffer_reset(obsBuffer);
-            assert(batch != NULL);
-            printf("------OBS Batch ref: %ld  ", batch->ref);
-            printf("xlen: %4d, ylen: %4d\n", batch->xlen, batch->ylen);
-            item = hashLongGetP(tftBatchHash, batch->ref);
-            if(item == NULL) {
-                printf("----NO MATCH TFT\n");
-            }
-            else {
-                tftBatch = (tft_batch_t *)item->pval;
-                tft_batch_active(tftBatch);
-                obs_boxes_show(obsBuffer);
-            }
+            obs_batch_active(tftBuffer, batch->ref);
+            obs_boxes_show(obsBuffer);
             sleep(1);
             batch = batch->next;
             /* test tft update */
         }while(batch != batch0);
-        tft_batch_update(tftBuffer, 20190302153001, "newgggcode", NULL);
-        //tft_batch_update(tftBuffer, 20190302153002, "pigie", NULL);
-        //tft_batch_update(tftBuffer, 20190302153003, NULL, "red");
+        tftBatch = tft_batch_update(tftBuffer, 20190302153001, "newgggcode", NULL);
+        if(tftBatch != NULL)
+            tft_area_delete(tftBatch->appArea);
+        tft_batch_update(tftBuffer, 20190302153002, "pigie", NULL);
+        tftBatch = tft_batch_update(tftBuffer, 20190302153003, NULL, "red");
+        if(tftBatch != NULL)
+            tft_area_new(tftBatch, TFT_AREA_TYPE_SUBAREA, "i like coding", 99,99,999,999);
+        tftBatch = tft_batch_update(tftBuffer, 20190302153004, NULL, NULL);
+        if(tftBatch != NULL)
+            tft_area_new(tftBatch, TFT_AREA_TYPE_SUBAREA, "what is this code", 99,99,999,999);
     }
 }
 
