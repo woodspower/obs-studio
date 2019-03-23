@@ -149,6 +149,8 @@ private:
 	QList<QPointer<QDockWidget>> extraDocks;
 
 	bool loaded = false;
+    /* LEO : stop saving */
+	// long disableSaving = 1;
 	long disableSaving = 1;
 	bool projectChanged = false;
 	bool previewEnabled = true;

@@ -1,0 +1,12 @@
+./obs-text/gdiplus/obs-text.cpp:OBS_MODULE_USE_DEFAULT_LOCALE("obs-text", "en-US")
+./obs-text/CMakeLists.txt:project(obs-text)
+./obs-text/CMakeLists.txt:	set(obs-text_PLATFORM_SOURCES
+./obs-text/CMakeLists.txt:		gdiplus/obs-text.cpp)
+./obs-text/CMakeLists.txt:	set(obs-text_PLATFORM_DEPS
+./obs-text/CMakeLists.txt:add_library(obs-text MODULE
+./obs-text/CMakeLists.txt:	${obs-text_PLATFORM_SOURCES}
+./obs-text/CMakeLists.txt:	${obs-text_PLATFORM_HEADERS})
+./obs-text/CMakeLists.txt:target_link_libraries(obs-text
+./obs-text/CMakeLists.txt:	${obs-text_PLATFORM_DEPS})
+./obs-text/CMakeLists.txt:install_obs_plugin_with_data(obs-text data)
+./CMakeLists.txt:add_subdirectory(obs-text)

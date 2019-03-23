@@ -798,6 +798,9 @@ EXPORT void obs_display_set_background_color(obs_display_t *display,
 /** Returns the translated display name of a source */
 EXPORT const char *obs_source_get_display_name(const char *id);
 
+/** LEO: Returns the parent scene of a source */
+EXPORT obs_scene_t *obs_source_get_scene(obs_source_t *source);
+
 /**
  * Creates a source of the specified type with the specified settings.
  *

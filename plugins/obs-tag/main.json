@@ -1,0 +1,47 @@
+{
+    "name":"qj-2288-01",
+    "batchs": [
+    {   "ref" : 20190302153001,
+        "app" : "qj",
+        "scence" : "passthrough",
+        "subareas" : [
+        {   "type" : "actor",
+            "xmin" : 0,
+            "ymin" : 0,
+            "xmax" : 50,
+            "ymax" : 50
+        },
+        {   "type" : "actor",
+            "xmin" : 100,
+            "ymin" : 100,
+            "xmax" : 150,
+            "ymax" : 150
+        },
+        {   "type" : "select",
+            "xmin" : 100,
+            "ymin" : 100,
+            "xmax" : 150,
+            "ymax" : 150
+        }         ]
+    },
+    {   "ref" : 20190302153007,
+        "app" : "qj",
+        "scence" : "upgrade",
+        "subareas" : [
+        {   "type" : "actor",
+            "xmin" : 0,
+            "ymin" : 0,
+            "xmax" : 50,
+            "ymax" : 50
+        },
+        {   "type" : "fast",
+            "xmin" : 100,
+            "ymin" : 100,
+            "xmax" : 150,
+            "ymax" : 150
+        }         ]
+    }           ]
+}
+        
+            
+        

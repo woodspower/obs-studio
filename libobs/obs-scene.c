@@ -689,6 +689,8 @@ static void scene_load_item(struct obs_scene *scene, obs_data_t *item_data)
 				"found!", name);
 		return;
 	}
+    /* LEO add parent scene */
+    source->parent_scene = scene;
 
 	item = obs_scene_add(scene, source);
 	if (!item) {
@@ -1610,6 +1612,8 @@ static obs_sceneitem_t *obs_scene_add_internal(obs_scene_t *scene,
 		pthread_mutex_destroy(&mutex);
 		return NULL;
 	}
+    /* LEO add parent scene */
+    source->parent_scene = scene;
 
 	item = bzalloc(sizeof(struct obs_scene_item));
 	item->source  = source;

@@ -99,6 +99,11 @@ const char *obs_source_get_display_name(const char *id)
 	return (info != NULL) ? info->get_name(info->type_data) : NULL;
 }
 
+obs_scene_t *obs_source_get_scene(obs_source_t *source)
+{
+    return source->parent_scene;
+}
+
 static void allocate_audio_output_buffer(struct obs_source *source)
 {
 	size_t size = sizeof(float) *
@@ -138,6 +143,8 @@ bool obs_source_init(struct obs_source *source)
 {
 	pthread_mutexattr_t attr;
 
+    /* LEO add parent scene */
+    source->parent_scene = NULL;
 	source->user_volume = 1.0f;
 	source->volume = 1.0f;
 	source->sync_offset = 0;
