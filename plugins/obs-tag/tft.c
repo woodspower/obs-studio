@@ -2,20 +2,6 @@
 Utility of tag data process for tfrecord generation.
 leo, lili
 ******************************************************************************/
-
-/*
-#include "util/bmem.h"
-#include "util/threading.h"
-#include "util/dstr.h"
-#include "util/darray.h"
-#include "util/platform.h"
-#include "graphics/vec2.h"
-#include "graphics/vec3.h"
-#include "graphics/vec4.h"
-#include "graphics/quat.h"
-#include "obs-data.h"
-*/
-
 #include "tft.h"
 
 
@@ -29,131 +15,6 @@ leo, lili
 #define TEST_BUFFER_NAME "qj-2288-01"
 
 
-/* insert new into a bi-direction linker */
-void tft_box_insert(tft_box_t *old, tft_box_t *new)
-{
-    tft_box_t *tmpnext;
-    assert(new != NULL);
-    if(old == NULL) {
-        return; 
-    }
-    tmpnext = old->next;
-    old->next = new;
-    new->prev = old;
-    if(tmpnext == old) {
-        old->prev = new;
-        new->next = old;
-    }
-    else {
-        tmpnext->prev = new;
-        new->next = tmpnext;
-    }
-}
-
-#if 0
-static void tft_box_add_scene(obs_scene_t *scene, obs_source_t *source)
-{
-	obs_sceneitem_t *item = NULL;
-	struct vec2 scale;
-
-	//vec2_set(&scale, 20.0f, 20.0f);
-
-	item = obs_scene_add(scene, source);
-	//obs_sceneitem_set_scale(item, &scale);
-}
-
-obs_source_t * obs_source_create(char *type, char *name, char *setting, char *key)
-{
-    return (obs_source_t *)malloc(sizeof(obs_source_t));
-}
-
-tft_box_t * tft_box_alloc(obs_scene_t *scene, char *name)
-{
-	obs_source_t *source;
-    tft_box_t *box = (tft_box_t *)malloc(sizeof(tft_box_t));
-    if (box == NULL) {
-        LOGE("tft_box_alloc out of memory.\n");
-        return NULL;
-    }
-   
-	source = obs_source_create("obs_box", name, NULL, NULL);
-    if (source == NULL) {
-        LOGE("tft_box_alloc source create failed.\n");
-        free(box);
-        return NULL;
-    }
-
-    box->source = source;
-    box->sceneitem = obs_scene_add(scene, source);
-    box->name = strdup(name);
-    box->status = 0;
-    box->prev = box;
-    box->next = box;
-    box->area = NULL;
-    return box;
-}
-
-void obs_batch_insert(obs_batch_t *old, obs_batch_t *new)
-{
-    obs_batch_t *tmpnext;
-    assert(new != NULL);
-    if(old == NULL)
-       return; 
-    tmpnext = old->next;
-    old->next = new;
-    new->prev = old;
-    if(tmpnext == old) {
-        old->prev = new;
-        new->next = old;
-    }
-    else {
-        tmpnext->prev = new;
-        new->next = tmpnext;
-    }
-}
-
-obs_batch_t * obs_batch_alloc(void)
-{
-    int i;
-    static long ref = 20190302153001;
-    obs_batch_t *tmp;
-    tmp = (obs_batch_t *)malloc(sizeof(obs_batch_t));
-    tmp->ref = ref++;
-    tmp->prev = tmp;
-    tmp->next = tmp;
-    tmp->xlen = 500;
-    tmp->ylen = 500;
-    return tmp;
-}
-
-obs_buffer_t * obs_buffer_load(void)
-{
-    int i;
-    struct obs_buffer *buffer;
-    obs_batch_t *old, *new;
-    buffer = (obs_buffer_t*)malloc(sizeof(obs_buffer_t));
-    assert(buffer != NULL);
-    buffer->name = strdup(TEST_BUFFER_NAME);
-    old = NULL;
-
-    for(i=0; i<TEST_BUFFER_BATCH_NUM; i++)
-    {
-        new = obs_batch_alloc();
-        obs_batch_insert(old, new);
-        old = new;
-    }
-    buffer->batchs = old;
-    
-    return buffer;
-}
-
-void obs_buffer_free(obs_buffer_t *buffer)
-{
-    return;
-}
-
-#endif
-
 static bool _sceneitem_set_invisible(obs_scene_t *scene, obs_sceneitem_t *item, void *param)
 {
     const char *id;
@@ -166,51 +27,7 @@ static bool _sceneitem_set_invisible(obs_scene_t *scene, obs_sceneitem_t *item, 
     return true;
 }
 
-/*
-void tft_box_reset(tft_buffer_t *buf)
-{
-    tft_box_t *box, *box0;
-
-    if(buf == NULL) return;
-
-    box0 = buf->boxes;
-    box = box0;
-    do {
-        if(box == NULL) return;
-        box->status = 0;
-        if (box->sceneitem != NULL)
-            obs_sceneitem_set_visible(box->sceneitem, false);
-        box = box->next;
-    }while(box != box0);
-}
-*/
-
-void tft_box_show(tft_buffer_t *buf)
-{
-    tft_box_t *box, *box0;
-    tft_area_t *area;
-
-    if(buf == NULL) return;
-
-    box0 = buf->boxes;
-    box = box0;
-    do {
-        if(box == NULL) {
-            LOGD("tft_box_show: NO box now.\n");
-            return;
-        }
-        if(box->status == 1) {
-            LOGI("------Box name: %s\n", box->name);
-            area = box->area;
-            assert (area != NULL);
-            LOGI("type:%d (xmin,ymin,xmax,ymax): (%d,%d,%d,%d)\n",
-            area->atype, area->xmin,area->ymin,area->xmax,area->ymax);
-        }
-        box = box->next;
-    }while(box != box0);
-}
-
-char * tft_new_name(char *name, int seq)
+static char * tft_new_name(char *name, int seq)
 {
     /* name and max 10 char len of seq number */
     char * new = (char *)malloc(strlen(name)+10);
@@ -220,63 +37,8 @@ char * tft_new_name(char *name, int seq)
     return new;
 }
 
-#if 0
-/* tft area assocate with obs box */
-void tft_area_associate(tft_area_t *new)
-{
-    tft_buffer_t *tftBuffer = new->batch->buffer;
-    hashTab *boxHash;
-    hashItem *item;
-    tft_box_t *box;
-    char * key;
 
-    if(tftBuffer == NULL) {
-        LOGE("tft_area_associate called but tftBuffer is NULL.\n");
-        return;
-    }
-
-    if(tftBuffer->scene == NULL) {
-        LOGE("tft_area_associate called but tftBuffer->scene is NULL.\n");
-        return;
-    }
-
-    boxHash = tftBuffer->boxHash;
-    assert(boxHash != NULL);
-    key = tft_new_name(new->name, new->seq);
-
-    /* check if associate existing box */
-    if(new->box != NULL) {
-        if(strcmp(key, new->box->name)!=0) {
-            LOGE("call tft_area_associate with error params. area name(%s) \
-                  should equal box name(%s)\n", key, new->box->name);
-        }
-        /* do not need create new box */
-        return;
-    }
-
-    item = hashGetP(boxHash, key);
-    if (item != NULL) {
-        assert(item->pval != NULL);
-        box = (tft_box_t *)item->pval;
-    }
-    else {
-        /* check if associate existing box */
-        if(new->box != NULL) box=new->box;
-        else box = tft_box_alloc(tftBuffer->scene, key);
-        /* insert box into hash table */
-        hashSetP(boxHash, key, (void*)box);
-        /* insert box into tftBuffer->boxes link */
-        if(tftBuffer->boxes == NULL) tftBuffer->boxes = box;
-        else tft_box_insert(tftBuffer->boxes, box);   
-    }
-    /* avoid memory leak */
-    free(key);
-    /* link box into tft_area_t */
-    new->box = box;
-}
-#endif
-
-void tft_area_insert(tft_area_t *old, tft_area_t *new)
+static void tft_area_insert(tft_area_t *old, tft_area_t *new)
 {
     tft_area_t *tmpnext;
     assert(new != NULL);
@@ -295,7 +57,7 @@ void tft_area_insert(tft_area_t *old, tft_area_t *new)
     }
 }
 
-void tft_area_free(tft_area_t *item)
+static void tft_area_free(tft_area_t *item)
 {
     tft_batch_t *batch;
     tft_area_t *tmpNext, *tmpPrev;
@@ -329,7 +91,7 @@ void tft_area_free(tft_area_t *item)
     free(item);
 }
 
-tft_area_t * tft_area_alloc(tft_batch_t *batch, char *name, enum tft_area_enum type, int x1, int y1, int x2, int y2)
+static tft_area_t * tft_area_alloc(tft_batch_t *batch, char *name, enum tft_area_enum type, int x1, int y1, int x2, int y2)
 {
     tft_area_t *tmp;
     hashItem *item;
@@ -341,7 +103,7 @@ tft_area_t * tft_area_alloc(tft_batch_t *batch, char *name, enum tft_area_enum t
     tmp->prev = tmp;
     tmp->next = tmp;
     tmp->last = NULL;
-    tmp->box  = NULL;
+    tmp->sceneitem  = NULL;
     tmp->xmin = x1;
     tmp->ymin = y1;
     tmp->xmax = x2;
@@ -387,18 +149,22 @@ void tft_area_delete(tft_area_t *area)
     LOGD("tft_area_delete in batch ref=%ld with name=%s, type=%d\n",
           batch->ref, area->name, area->atype);
 
+    /* Lock and process this batch */
+	pthread_mutex_lock(&batch->mutex);
+
+
     if(area->atype == TFT_AREA_TYPE_APP) {
         LOGD("tft_area_delete delete app area: %s\n", area->name);
-        /* only remove app area and scence area counter */
+        /* only remove app area and scene area counter */
         hashDelK(batch->areaHash, area->name);
         batch->appArea = NULL;
     }
 
     if(area->atype == TFT_AREA_TYPE_SCENCE) {
-        LOGD("tft_area_delete delete scence area: %s\n", area->name);
-        /* only remove app area and scence area counter */
+        LOGD("tft_area_delete delete scene area: %s\n", area->name);
+        /* only remove app area and scene area counter */
         hashDelK(batch->areaHash, area->name);
-        batch->scenceArea = NULL;
+        batch->sceneArea = NULL;
     }
 
     /* do NOT remove subarea counter to avoid conflict */
@@ -406,6 +172,8 @@ void tft_area_delete(tft_area_t *area)
 
     /* remove form batch->areas linker and free */
     tft_area_free(area);
+
+	pthread_mutex_unlock(&batch->mutex);
 }
 
 
@@ -413,6 +181,7 @@ void tft_area_delete(tft_area_t *area)
 tft_area_t * tft_area_new(tft_batch_t *batch, enum tft_area_enum type, char *name, int x1, int y1, int x2, int y2)
 {
     tft_area_t *area;
+
     if(batch == NULL || batch->areaHash == NULL ) {
         LOGE("ERROR: call tft_area_new with null batch. \
               batch=%p, areaHash=%p\n",\
@@ -421,17 +190,43 @@ tft_area_t * tft_area_new(tft_batch_t *batch, enum tft_area_enum type, char *nam
     }
 
     LOGD("tft_area_new in batch ref=%ld with name=%s, \
-          batch.app=%p, batch.scence=%p, areaHash=%p\n",\
-          batch->ref, name, batch->appArea, batch->scenceArea, batch->areaHash);
+          batch.app=%p, batch.scene=%p, areaHash=%p\n",\
+          batch->ref, name, batch->appArea, batch->sceneArea, batch->areaHash);
+
+    /* Lock and process this batch */
+	pthread_mutex_lock(&batch->mutex);
 
     area = tft_area_alloc(batch, name, type, x1,y1,x2,y2);
-    /* update batch app or scence area pointer */
+    /* update batch app or scene area pointer */
     if (area != NULL) {
-        if (type == TFT_AREA_TYPE_APP)
-            batch->appArea = area;
-        else if (type == TFT_AREA_TYPE_SCENCE)
-            batch->scenceArea = area;
+        if (type == TFT_AREA_TYPE_APP) {
+            if (batch->appArea == NULL) {
+                LOGD("tft_area_new: update %ld with new \
+                    app: %s from old NULL app\n", batch->ref, name);
+                batch->appArea = area;
+            }
+            else {
+                LOGD("tft_area_new: update %ld with new \
+                    app: %s from old app: %s\n", batch->ref, name, batch->appArea->name);
+                tft_area_delete(batch->appArea);
+                batch->appArea = area;
+            }
+        }
+        else if (type == TFT_AREA_TYPE_SCENCE) {
+            if (batch->sceneArea == NULL) {
+                LOGD("tft_area_new: update %ld with new \
+                    scene: %s from old NULL scene\n", batch->ref, name);
+                batch->sceneArea = area;
+            }
+            else {
+                LOGD("tft_area_new: update %ld with new \
+                    scene: %s from old scene: %s\n", batch->ref, name, batch->sceneArea->name);
+                tft_area_delete(batch->sceneArea);
+                batch->sceneArea = area;
+            }
+        }
     }
+	pthread_mutex_unlock(&batch->mutex);
     return area;
 }
 
@@ -442,13 +237,16 @@ void tft_area_update(tft_area_t *area, int x1, int y1, int x2, int y2)
         LOGE("tft_area_update called with NULL area param\n");
         return;
     }
+    /* Lock and process this batch */
+	pthread_mutex_lock(&area->batch->mutex);
     area->xmin = x1;
     area->ymin = y1;
     area->xmax = x2;
     area->ymax = y2;
+	pthread_mutex_unlock(&area->batch->mutex);
 }
 
-void tft_batch_insert(tft_batch_t *old, tft_batch_t *new)
+static void tft_batch_insert(tft_batch_t *old, tft_batch_t *new)
 {
     tft_batch_t *tmpnext;
     assert(new != NULL);
@@ -467,15 +265,15 @@ void tft_batch_insert(tft_batch_t *old, tft_batch_t *new)
     }
 }
 
-tft_batch_t * tft_batch_alloc(tft_buffer_t *buf, long ref)
+static tft_batch_t * tft_batch_alloc(tft_buffer_t *buf, long ref)
 {
+	pthread_mutexattr_t attr;
     tft_batch_t *tmp;
 
     if (buf == NULL) {
         LOGE("ERROR: call tft_batch_alloc with null buf.\n");
         return NULL;
     }
-
     tmp = (tft_batch_t *)malloc(sizeof(tft_batch_t));
     if (tmp != NULL) {
         tmp->prev = tmp;
@@ -484,11 +282,21 @@ tft_batch_t * tft_batch_alloc(tft_buffer_t *buf, long ref)
         tmp->buffer = buf;
         tmp->ref = ref;
         tmp->appArea = NULL;
-        tmp->scenceArea = NULL;
+        tmp->sceneArea = NULL;
         /* create area hashtab inside batch */
         tmp->areaHash = hashInit(TFT_AREA_NUM_MAX);
         assert(tmp->areaHash != NULL);
 
+        if (pthread_mutexattr_init(&attr) != 0 || 
+            pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE) != 0) {
+            LOGE("ERROR: create tft batch mutex attr failed.\n");
+            return NULL;
+        }
+        if (pthread_mutex_init(&tmp->mutex, &attr) != 0) {
+            LOGE("Failed to create tft batch mutex");
+            free(tmp);
+            return NULL;
+        }
         /* insert into linker and hashtab */
         if (buf->batchs == NULL) buf->batchs = tmp;
         else tft_batch_insert(buf->batchs, tmp);
@@ -523,7 +331,7 @@ tft_batch_t * tft_batch_load(json_t *unit, tft_buffer_t *buffer)
     name = (char *)json_string_value(subunit);
     tft_area_new(tmp, TFT_AREA_TYPE_APP, name, 0,0,0,0);
 
-    subunit = json_object_get(unit, "scence");
+    subunit = json_object_get(unit, "scene");
     assert(json_typeof(subunit) == JSON_STRING);
     name = (char *)json_string_value(subunit);
     tft_area_new(tmp, TFT_AREA_TYPE_SCENCE, name, 0,0,0,0);
@@ -557,8 +365,8 @@ tft_batch_t * tft_batch_load(json_t *unit, tft_buffer_t *buffer)
 }
 
 
-/* update appArea or scenceArea */
-tft_batch_t * tft_batch_update(tft_buffer_t *buf, long ref, char *appName, char *scenceName)
+/* update appArea or sceneArea */
+tft_batch_t * tft_batch_update(tft_buffer_t *buf, long ref, char *appName, char *sceneName)
 {
     tft_batch_t *batch;
     hashLongItem *item;
@@ -578,52 +386,25 @@ tft_batch_t * tft_batch_update(tft_buffer_t *buf, long ref, char *appName, char 
             LOGE("tft_batch_update: out of memory.\n");
             return NULL;
         }
-        if (appName != NULL) 
-            tft_area_new(batch, TFT_AREA_TYPE_APP, appName, 0,0,0,0);
-        if (scenceName != NULL)
-            tft_area_new(batch, TFT_AREA_TYPE_SCENCE, scenceName, 0,0,0,0);
     }
     /* update exist batch */
     else {
         batch = item->pval;
         assert(batch != NULL);
-        /* update app area */
-        if (appName != NULL) {
-            if (batch->appArea == NULL) {
-                LOGD("tft_batch_update: update %ld with new \
-                    app: %s from old NULL app\n", ref, appName);
-                tft_area_new(batch, TFT_AREA_TYPE_APP, appName, 0,0,0,0);
-            }
-            else if (strcmp(appName, batch->appArea->name) != 0) {
-                LOGD("tft_batch_update: update %ld with new \
-                    app: %s from old app: %s\n", ref, appName, batch->appArea->name);
-                tft_area_delete(batch->appArea);
-                tft_area_new(batch, TFT_AREA_TYPE_APP, appName, 0,0,0,0);
-            }
-        }
-        /* update scence area */
-        else if (scenceName != NULL) {
-            if (batch->scenceArea == NULL) {
-                LOGD("tft_batch_update: update %ld with new \
-                    scence: %s from old NULL scence\n", ref, scenceName);
-                tft_area_new(batch, TFT_AREA_TYPE_SCENCE, scenceName, 0,0,0,0);
-            }
-            else if (strcmp(scenceName, batch->scenceArea->name) != 0) {
-                LOGD("tft_batch_update: update %ld with new \
-                    scence: %s from old scence: %s\n", ref, scenceName, batch->scenceArea->name);
-                tft_area_delete(batch->scenceArea);
-                tft_area_new(batch, TFT_AREA_TYPE_SCENCE, scenceName, 0,0,0,0);
-            }
-        }
     }
+    /* update app area */
+    if (appName != NULL) 
+        tft_area_new(batch, TFT_AREA_TYPE_APP, appName, 0,0,0,0);
+    /* update scene area */
+    if (sceneName != NULL)
+        tft_area_new(batch, TFT_AREA_TYPE_SCENCE, sceneName, 0,0,0,0);
     
     return batch;
 }
 
-void tft_box_active(tft_buffer_t *tftBuffer, long ref)
+void tft_batch_active(tft_buffer_t *tftBuffer, long ref)
 {
     tft_area_t *area, *area0;
-    tft_box_t *box;
     obs_sceneitem_t *sceneitem;
     obs_source_t *source;
     hashLongItem *item;
@@ -652,9 +433,13 @@ void tft_box_active(tft_buffer_t *tftBuffer, long ref)
     area0 = tftBatch->areas;
     area = area0;
     if(area == NULL) {
-        LOGD("tft_box_active called with NULL area\n");
+        LOGD("tft_batch_active called with NULL area\n");
         return;
     }
+
+    /* Lock and process this batch */
+	pthread_mutex_lock(&tftBatch->mutex);
+    
     do {
         /* try associate dynamic */
         sceneitem = obs_scene_find_source(tftBuffer->scene, area->fullname);
@@ -672,24 +457,11 @@ void tft_box_active(tft_buffer_t *tftBuffer, long ref)
             obs_sceneitem_set_pos(sceneitem, &pos);
             obs_sceneitem_set_visible(sceneitem, true);
         }
-        
-/*
-        if (area->box == NULL)
-            tft_area_associate(area);
-        if (area->box == NULL) {
-            LOGD("tft_box_active failed for area: %s, seq: %d \n",
-                area->name, area->seq);
-            continue;
-        }
-        box = area->box;
-        box->status = 1;
-        if (box->sceneitem != NULL)
-            obs_sceneitem_set_visible(box->sceneitem, true);
-        box->area = area;
-*/
-
+        area->sceneitem = sceneitem;
         area = area->next;
     }while(area != area0);
+
+	pthread_mutex_unlock(&tftBatch->mutex);
 }
 
 tft_buffer_t * tft_buffer_load(obs_scene_t *scene, const char *jsonfile)
@@ -725,10 +497,6 @@ tft_buffer_t * tft_buffer_load(obs_scene_t *scene, const char *jsonfile)
     unit = json_object_get(root, "batchs");
     assert(json_typeof(unit) == JSON_ARRAY);
 
-    /* init code boxHash */
-    buffer->boxes = NULL;
-    buffer->boxHash = hashInit(TFT_BOX_NUM_MAX);
-
     for(i=0; i<json_array_size(unit); i++)
     {
         new = tft_batch_load(json_array_get(unit, i), buffer);
@@ -743,57 +511,10 @@ tft_buffer_t * tft_buffer_load(obs_scene_t *scene, const char *jsonfile)
 
 void tft_buffer_free(tft_buffer_t *buffer)
 {
+    (void)buffer;
     return;
 }
 
-/*
-tf_tag_batch * tf_tag_load(json_t *root)
-    switch (json_typeof(element)) {
-    case JSON_OBJECT:
-        print_json_object(element, indent);
-    size = json_object_size(element);
-
-    printf("JSON Object of %ld pair%s:\n", size, json_plural(size));
-    json_object_foreach(element, key, value) {
-        print_json_indent(indent + 2);
-        printf("JSON Key: \"%s\"\n", key);
-        print_json_aux(value, indent + 2);
-    }
-*/
-
-#if 0
-
-void obs_buffer_print(obs_buffer_t *buf)
-{
-    char * name;
-    obs_batch_t *batch, *batch0;
-    tft_box_t *box, *box0;
-    if(buf == NULL) {
-        LOGE("OBS BUFFER is empty.\n");
-        return;
-    }
-
-    name = buf->name;
-    LOGI("*************OBS Buffer: %s ***************\n", name);
-    batch0 = buf->batchs;
-    batch = batch0;
-    do {
-        assert(batch != NULL);
-        LOGI("------Batch ref: %ld\n", batch->ref);
-        LOGI("xlen: %4d, ylen: %4d\n", batch->xlen, batch->ylen);
-        batch = batch->next;
-    }while(batch != batch0);
-
-    box0 = buf->boxes;
-    box = box0;
-    do {
-        if (box == NULL) continue;
-        LOGI("------Box name: %s\n", box->name);
-        box = box->next;
-    }while(box != box0);
-}
-
-#endif
 
 void tft_buffer_print(tft_buffer_t *buf)
 {
@@ -812,7 +533,7 @@ void tft_buffer_print(tft_buffer_t *buf)
     do {
         assert(batch != NULL);
         LOGI("------Batch ref: %ld\n", batch->ref);
-        LOGI("------app.scence: %s.%s\n", batch->appArea->name, batch->scenceArea->name);
+        LOGI("------app.scene: %s.%s\n", batch->appArea->name, batch->sceneArea->name);
 
         area0 = batch->areas;
         area = area0;
@@ -835,8 +556,7 @@ void test_run(tft_buffer_t *tftBuffer)
     for (int i=0; i<3; i++) {
         LOGI("*************Run obs Buffer***************\n");
         for (long ref=2018030602102; ref<2018030602199; ref+=10) {
-            tft_box_active(tftBuffer, ref);
-            tft_box_show(tftBuffer);
+            tft_batch_active(tftBuffer, ref);
             sleep(1);
         }
         /* test tft update */

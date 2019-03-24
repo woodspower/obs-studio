@@ -319,7 +319,7 @@ void box_update(struct sourceview *ss, obs_source_t *source)
 	file = obs_data_get_string(settings, "file");
     ref = get_boxref(file);
     printf("box_update(%li). file:%s\n",ref, file);
-    tft_box_active(ss->tftBuffer, ref);
+    tft_batch_active(ss->tftBuffer, ref);
 }
 
 static void do_transition(void *data, bool to_null, bool next)

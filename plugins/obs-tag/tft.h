@@ -13,6 +13,7 @@ leo, lili
 #include "obs-module.h"
 #include "util/shash.h"
 #include "util/lhash.h"
+#include "util/threading.h"
 //#include "graphics/vec2.h"
 
 /* max 10000 boxes in one obs buffer */
@@ -25,42 +26,6 @@ leo, lili
 #define TFT_NAME_LEN_MAX  128
 
 
-
-typedef struct tft_box {
-	char *name;
-    obs_source_t *source;
-    obs_sceneitem_t *sceneitem;
-    /* if==1 ON, if==0 OFF */
-    int  status;
-	struct tft_box *prev;
-	struct tft_box *next;
-    /* current active tft area */
-    struct tft_area *area;
-}tft_box_t;
-
-
-
-#if 0
-typedef struct obs_scene_t {
-    char *name;
-}obs_scene_t;
-typedef struct obs_source_t {
-    char *name;
-}obs_source_t;
-
-typedef struct obs_batch {
-	volatile long ref;
-	struct obs_batch *prev;
-	struct obs_batch *next;
-	unsigned int xlen;
-	unsigned int ylen;
-}obs_batch_t;
-
-typedef struct obs_buffer {
-	char *name;
-	struct obs_batch *batchs;
-}obs_buffer_t;
-#endif
 
 enum tft_area_enum {
 	TFT_AREA_TYPE_APP,
@@ -80,7 +45,7 @@ typedef struct tft_area {
 	struct tft_area *prev;
 	struct tft_area *next;
     struct tft_batch *batch;
-    tft_box_t *box;
+    obs_sceneitem_t  *sceneitem;
 	unsigned xmin;
 	unsigned ymin;
 	unsigned xmax;
@@ -89,8 +54,9 @@ typedef struct tft_area {
 
 typedef struct tft_batch {
 	volatile long ref;
+	pthread_mutex_t  mutex;
     tft_area_t *appArea;
-    tft_area_t *scenceArea;
+    tft_area_t *sceneArea;
 	struct tft_batch *prev;
 	struct tft_batch *next;
     struct tft_buffer *buffer;
@@ -103,11 +69,9 @@ typedef struct tft_buffer {
     obs_scene_t *scene;
 	struct tft_batch *batchs;
     hashLongTab *batchHash;
-    tft_box_t *boxes;
-	hashTab *boxHash;
 }tft_buffer_t;
 
 extern tft_buffer_t * tft_buffer_load(obs_scene_t *scene, const char *jsonfile);
-extern void tft_box_active(tft_buffer_t *tftBuffer, long ref);
+extern void tft_batch_active(tft_buffer_t *tftBuffer, long ref);
 
 #endif
