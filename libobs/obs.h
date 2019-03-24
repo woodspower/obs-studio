@@ -21,6 +21,8 @@
 #include "util/bmem.h"
 #include "util/profiler.h"
 #include "util/text-lookup.h"
+#include "util/shash.h"
+#include "util/lhash.h"
 #include "graphics/graphics.h"
 #include "graphics/vec2.h"
 #include "graphics/vec3.h"

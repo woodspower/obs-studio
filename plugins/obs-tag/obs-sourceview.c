@@ -308,7 +308,7 @@ static long get_boxref(const char *filepath)
     }
 }
         
-void box_reset(struct sourceview *ss, obs_source_t *source)
+void box_update(struct sourceview *ss, obs_source_t *source)
 {
     const char *file;
     long ref;
@@ -318,7 +318,7 @@ void box_reset(struct sourceview *ss, obs_source_t *source)
 	obs_data_t *settings = obs_source_get_settings(source);
 	file = obs_data_get_string(settings, "file");
     ref = get_boxref(file);
-    printf("box_reset(%li). file:%s\n",ref, file);
+    printf("box_update(%li). file:%s\n",ref, file);
     tft_box_active(ss->tftBuffer, ref);
 }
 
@@ -352,7 +352,7 @@ static void do_transition(void *data, bool to_null, bool next)
 		return;
 
     //LEO: test
-    box_reset(ss, source);
+    box_update(ss, source);
 
 	if (ss->use_cut)
 		obs_transition_set(ss->transition, source);
@@ -384,38 +384,8 @@ static void ss_update(void *data, obs_data_t *settings)
 	const char *behavior;
 	const char *mode;
 
-    obs_source_t *scenesrc;
-    obs_scene_t *scene;
-
-/*
-    scenesrc = obs_get_source_by_name("leo");
-    if (scenesrc != NULL) {
-        scene = obs_scene_from_source(scenesrc);
-        obs_source_remove(scenesrc);
-        obs_scene_release(scene);
-    }
-    scene = obs_scene_create("leo3");
-    if (scene == NULL)
-        warn("ss_update failed when obs_scene_create error.\n");
-*/
-#if 0
-    if (ss->tftBuffer->scene == NULL) {
-        scenesrc = obs_frontend_get_current_scene();
-        scene = obs_scene_from_source(scenesrc);
-        warn("scene(%p):%s is updated from source(%p)\n", scene, obs_source_get_name(scenesrc), scenesrc);
-        ss->tftBuffer->scene = scene;
-    }
-
-#endif
+    /* add scene to tftbuffer */
     ss->tftBuffer->scene = obs_source_get_scene(ss->source);
-/*
-    scenesrc = obs_get_source_by_name("Scene");
-    if (scenesrc == NULL)
-        scene = obs_scene_create("Scene");
-    else
-        scene = obs_scene_from_source(scenesrc);
-*/
-
 
 	/* ------------------------------------- */
 	/* get settings data */
@@ -1084,34 +1054,6 @@ static void ss_deactivate(void *data)
 		ss->pause_on_deactivate = true;
 }
 
-#if 0
-static void test_run(tft_buffer_t *tftBuffer)
-{
-    tft_batch_t *tftBatch;
-
-    for (int i=0; i<3; i++) {
-        LOGI("*************Run obs Buffer***************\n");
-        for (long ref=2018030602102; ref<2018030602199; ref+=10) {
-            tft_box_active(tftBuffer, ref);
-            tft_box_show(tftBuffer);
-            sleep(1);
-        }
-        /* test tft update */
-        tftBatch = tft_batch_update(tftBuffer, 2018030602102, "newgggcode", NULL);
-        tft_batch_update(tftBuffer, 20190302153002, "pigie", NULL);
-        tftBatch = tft_batch_update(tftBuffer, 20190302153003, NULL, "red");
-        if(tftBatch != NULL)
-            tft_area_new(tftBatch, TFT_AREA_TYPE_SUBAREA, "i like coding", 99,99,999,999);
-        tftBatch = tft_batch_update(tftBuffer, 20190302153004, NULL, NULL);
-        if(tftBatch != NULL)
-            tft_area_delete(tftBatch->appArea);
-        if(tftBatch != NULL)
-            tft_area_new(tftBatch, TFT_AREA_TYPE_SUBAREA, "what is this code", 99,99,999,999);
-    }
-}
-
-
-#endif
 
 struct obs_source_info sourceview_info = {
 	.id                  = "sourceview",

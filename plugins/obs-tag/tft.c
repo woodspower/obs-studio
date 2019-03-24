@@ -66,7 +66,6 @@ obs_source_t * obs_source_create(char *type, char *name, char *setting, char *ke
 {
     return (obs_source_t *)malloc(sizeof(obs_source_t));
 }
-#endif
 
 tft_box_t * tft_box_alloc(obs_scene_t *scene, char *name)
 {
@@ -77,7 +76,7 @@ tft_box_t * tft_box_alloc(obs_scene_t *scene, char *name)
         return NULL;
     }
    
-	source = obs_source_create("obs_tag", name, NULL, NULL);
+	source = obs_source_create("obs_box", name, NULL, NULL);
     if (source == NULL) {
         LOGE("tft_box_alloc source create failed.\n");
         free(box);
@@ -94,7 +93,6 @@ tft_box_t * tft_box_alloc(obs_scene_t *scene, char *name)
     return box;
 }
 
-#if 0
 void obs_batch_insert(obs_batch_t *old, obs_batch_t *new)
 {
     obs_batch_t *tmpnext;
@@ -156,6 +154,19 @@ void obs_buffer_free(obs_buffer_t *buffer)
 
 #endif
 
+static bool _sceneitem_set_invisible(obs_scene_t *scene, obs_sceneitem_t *item, void *param)
+{
+    const char *id;
+    id = obs_source_get_id(obs_sceneitem_get_source(item)); 
+    if (id != NULL && strcmp("obs_box", id) == 0)
+        obs_sceneitem_set_visible(item, false);
+
+    UNUSED_PARAMETER(scene);
+    UNUSED_PARAMETER(param);
+    return true;
+}
+
+/*
 void tft_box_reset(tft_buffer_t *buf)
 {
     tft_box_t *box, *box0;
@@ -172,6 +183,7 @@ void tft_box_reset(tft_buffer_t *buf)
         box = box->next;
     }while(box != box0);
 }
+*/
 
 void tft_box_show(tft_buffer_t *buf)
 {
@@ -208,6 +220,7 @@ char * tft_new_name(char *name, int seq)
     return new;
 }
 
+#if 0
 /* tft area assocate with obs box */
 void tft_area_associate(tft_area_t *new)
 {
@@ -261,6 +274,7 @@ void tft_area_associate(tft_area_t *new)
     /* link box into tft_area_t */
     new->box = box;
 }
+#endif
 
 void tft_area_insert(tft_area_t *old, tft_area_t *new)
 {
@@ -339,6 +353,8 @@ tft_area_t * tft_area_alloc(tft_batch_t *batch, char *name, enum tft_area_enum t
     else tmp->seq = 1;
     LOGD("hashGetI(%s)=%d\n",name,tmp->seq);
     assert(hashSetI(batch->areaHash, name, tmp->seq)>=0);
+
+    tmp->fullname = tft_new_name(name, tmp->seq);
 
     /* add into batch->areas linker */
     if(batch->areas == NULL) {
@@ -608,16 +624,20 @@ void tft_box_active(tft_buffer_t *tftBuffer, long ref)
 {
     tft_area_t *area, *area0;
     tft_box_t *box;
+    obs_sceneitem_t *sceneitem;
+    obs_source_t *source;
     hashLongItem *item;
     tft_batch_t *tftBatch;
     hashLongTab *tftBatchHash;
+    struct vec2 pos;
 
-    if(tftBuffer == NULL) {
-        LOGE("TFT BUFFER is empty.\n");
+    if(tftBuffer == NULL || tftBuffer->scene == NULL) {
+        LOGE("TFT BUFFER or SCENE is empty.\n");
         return;
     }
 
-    tft_box_reset(tftBuffer);
+    /* reset all box invisible in current scene */
+	obs_scene_enum_items(tftBuffer->scene, _sceneitem_set_invisible, NULL);
     
     LOGI("------TFT Batch ref: %ld  \n", ref);
     tftBatchHash = tftBuffer->batchHash;
@@ -629,7 +649,6 @@ void tft_box_active(tft_buffer_t *tftBuffer, long ref)
     }
     tftBatch = (tft_batch_t *)item->pval;
 
-
     area0 = tftBatch->areas;
     area = area0;
     if(area == NULL) {
@@ -638,6 +657,23 @@ void tft_box_active(tft_buffer_t *tftBuffer, long ref)
     }
     do {
         /* try associate dynamic */
+        sceneitem = obs_scene_find_source(tftBuffer->scene, area->fullname);
+        if (sceneitem == NULL) {
+            source = obs_source_create("obs_box", area->fullname, NULL, NULL);
+            if (source == NULL) {
+                LOGE("obs_source_create failed.\n");
+                continue;
+            }
+            sceneitem = obs_scene_add(tftBuffer->scene, source);
+        }
+        else {
+            pos.x = area->xmin;
+            pos.y = area->ymin;
+            obs_sceneitem_set_pos(sceneitem, &pos);
+            obs_sceneitem_set_visible(sceneitem, true);
+        }
+        
+/*
         if (area->box == NULL)
             tft_area_associate(area);
         if (area->box == NULL) {
@@ -650,6 +686,7 @@ void tft_box_active(tft_buffer_t *tftBuffer, long ref)
         if (box->sceneitem != NULL)
             obs_sceneitem_set_visible(box->sceneitem, true);
         box->area = area;
+*/
 
         area = area->next;
     }while(area != area0);

@@ -111,6 +111,11 @@ static void *scene_create(obs_data_t *settings, struct obs_source *source)
 		goto fail;
 	}
 
+    /* LEO: create a hash table for child sources */
+    /* max 10000 boxes in one obs scene */
+    #define SCENE_CHILD_HASH_NUM  10000
+    scene->sourceHash = hashInit(SCENE_CHILD_HASH_NUM);
+
 	UNUSED_PARAMETER(settings);
 	return scene;
 
@@ -1684,6 +1689,11 @@ obs_sceneitem_t *obs_scene_add(obs_scene_t *scene, obs_source_t *source)
 	obs_sceneitem_t *item = obs_scene_add_internal(scene, source, NULL);
 	struct calldata params;
 	uint8_t stack[128];
+
+    /* LEO: create a hash table for child sources */
+    scene->sourceHash = hashInit(SCENE_CHILD_HASH_NUM);
+    /* insert box into hash table */
+    hashSetP(scene->sourceHash, obs_source_get_name(source), (void*)source);
 
 	calldata_init_fixed(&params, stack, sizeof(stack));
 	calldata_set_ptr(&params, "scene", scene);

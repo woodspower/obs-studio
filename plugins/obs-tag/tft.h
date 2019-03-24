@@ -9,10 +9,11 @@ leo, lili
 #include <string.h>
 #include <unistd.h>
 #include <assert.h>
-#include <jansson.h>
-#include <obs-module.h>
-#include "shash.h"
-#include "lhash.h"
+#include "jansson.h"
+#include "obs-module.h"
+#include "util/shash.h"
+#include "util/lhash.h"
+//#include "graphics/vec2.h"
 
 /* max 10000 boxes in one obs buffer */
 #define TFT_BOX_NUM_MAX  10000
@@ -73,6 +74,7 @@ typedef struct tft_area {
 	char *name;
     /* instance number of same name */
     int seq;
+	char *fullname;
     /* find the last one which have same name */
 	struct tft_area *last;
 	struct tft_area *prev;

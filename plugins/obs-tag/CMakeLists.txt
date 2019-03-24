@@ -8,16 +8,12 @@ if(MSVC)
 endif()
 
 set(obs-tag_HEADERS
-	tft.h
-	lhash.h
-	shash.h)
+	tft.h)
 
 set(obs-tag_SOURCES
 	obs-tag.c
 	obs-sourceview.c
-	tft.c
-	shash.c
-	lhash.c)
+	tft.c)
 
 add_library(obs-tag MODULE
 	${obs-tag_HEADERS}

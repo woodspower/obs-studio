@@ -86,6 +86,9 @@ struct obs_scene_item {
 struct obs_scene {
 	struct obs_source     *source;
 
+    /* LEO: create a hash table for child sources */
+	hashTab               *sourceHash;
+
 	bool                  is_group;
 	bool                  custom_size;
 	uint32_t              cx;

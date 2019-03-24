@@ -328,6 +328,8 @@ set(libobs_util_SOURCES
 	util/platform.c
 	util/cf-lexer.c
 	util/bmem.c
+	util/lhash.c
+	util/shash.c
 	util/config-file.c
 	util/lexer.c
 	util/dstr.c
@@ -347,6 +349,8 @@ set(libobs_util_HEADERS
 	util/vc/vc_stdbool.h
 	util/vc/vc_stdint.h
 	util/bmem.h
+	util/lhash.h
+	util/shash.h
 	util/c99defs.h
 	util/util_uint128.h
 	util/cf-parser.h
