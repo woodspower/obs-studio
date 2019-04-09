@@ -51,7 +51,7 @@ void hashInsert(hashItem *old, hashItem *new)
 }
 
 /* hash: form hash value for string key */
-unsigned eval(char *key, size_t size)
+unsigned eval(const char *key, size_t size)
 {
     unsigned hindex;
     for (hindex = 0; *key != '\0'; key++)
@@ -60,7 +60,7 @@ unsigned eval(char *key, size_t size)
 }
 
 /* hashGetP: look the pointer val for Hashtab */
-hashItem *hashGetP(hashTab *head, char *key)
+hashItem *hashGetP(hashTab *head, const char *key)
 {
     hashItem *np, *np0;
     hashItem **tab = head->gHashtab;
@@ -77,7 +77,7 @@ hashItem *hashGetP(hashTab *head, char *key)
 }
 
 /* hashSetP: put (key, pval) in Hashtab */
-int hashSetP(hashTab *head, char *key, void *pval)
+int hashSetP(hashTab *head, const char *key, void *pval)
 {
     hashItem *np, *tmp;
     unsigned hindex;
@@ -98,7 +98,7 @@ int hashSetP(hashTab *head, char *key, void *pval)
 }
 
 /* hashDelK: put (key, pval) in Hashtab */
-void hashDelK(hashTab *head, char *key)
+void hashDelK(hashTab *head, const char *key)
 {
     hashItem *np, *tmpNext, *tmpPrev;
     unsigned hindex;
@@ -132,7 +132,7 @@ void hashDelK(hashTab *head, char *key)
 
 
 /* hashGetI: look the integer val for Hashtab */
-hashItem * hashGetI(hashTab *head, char *key)
+hashItem * hashGetI(hashTab *head, const char *key)
 {
     hashItem *np, *np0;
     hashItem **tab = head->gHashtab;
@@ -149,7 +149,7 @@ hashItem * hashGetI(hashTab *head, char *key)
 }
 
 /* hashSetI: put (key, ival) in Hashtab */
-int hashSetI(hashTab *head, char *key, int ival)
+int hashSetI(hashTab *head, const char *key, int ival)
 {
     hashItem *np, *tmp;
     unsigned hindex;

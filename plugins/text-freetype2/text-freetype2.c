@@ -35,6 +35,15 @@ MODULE_EXPORT const char *obs_module_description(void)
 
 uint32_t texbuf_w = 2048, texbuf_h = 2048;
 
+static bool ft2_source_save(void *data, obs_data_t *settings)
+{
+	UNUSED_PARAMETER(settings);
+	UNUSED_PARAMETER(data);
+    /* DO NOT save any box info */
+    return false;
+}
+
+
 static struct obs_source_info freetype2_source_info = {
 	.id = "text_ft2_source",
 	.type = OBS_SOURCE_TYPE_INPUT,
@@ -52,6 +61,8 @@ static struct obs_source_info freetype2_source_info = {
 	.video_render = ft2_source_render,
 	.video_tick = ft2_video_tick,
 	.get_properties = ft2_source_properties,
+    /* LEO: add save controller */
+	.save           = ft2_source_save,
 };
 
 static bool plugin_initialized = false;

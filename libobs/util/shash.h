@@ -22,11 +22,11 @@ typedef struct hashTab {
 }hashTab;
 
 hashTab * hashInit(size_t size);
-hashItem * hashGetP(hashTab *head, char *s);
-int hashSetP(hashTab *head, char *key, void *pval);
-hashItem * hashGetI(hashTab *head, char *s);
-int hashSetI(hashTab *head, char *key, int ival);
-void hashDelK(hashTab *head, char *key);
+hashItem * hashGetP(hashTab *head, const char *s);
+int hashSetP(hashTab *head, const char *key, void *pval);
+hashItem * hashGetI(hashTab *head, const char *s);
+int hashSetI(hashTab *head, const char *key, int ival);
+void hashDelK(hashTab *head, const char *key);
 
 
 #endif

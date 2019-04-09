@@ -647,7 +647,8 @@ EXPORT obs_data_t *obs_save_source(obs_source_t *source);
 EXPORT obs_source_t *obs_load_source(obs_data_t *data);
 
 /** Send a save signal to sources */
-EXPORT void obs_source_save(obs_source_t *source);
+/* LEO: change return type from void to bool */
+EXPORT bool obs_source_save(obs_source_t *source);
 
 /** Send a load signal to sources */
 EXPORT void obs_source_load(obs_source_t *source);
@@ -1356,6 +1357,11 @@ EXPORT obs_scene_t *obs_scene_duplicate(obs_scene_t *scene, const char *name,
 
 EXPORT void        obs_scene_addref(obs_scene_t *scene);
 EXPORT void        obs_scene_release(obs_scene_t *scene);
+
+/* LEO: Add a handle into scene */
+/** A handle pointer which can be associated with scene, i.e. tftBuffer */
+EXPORT void *obs_scene_get_handle(const obs_scene_t *scene);
+EXPORT void obs_scene_set_handle(obs_scene_t *scene, void *handle);
 
 /** Gets the scene's source context */
 EXPORT obs_source_t *obs_scene_get_source(const obs_scene_t *scene);

@@ -331,11 +331,13 @@ struct obs_source_info {
 	 * sometimes a source needs to know when it is being saved so it
 	 * doesn't always have to update the current settings until a certain
 	 * point.
+     * LEO: add return bool to determine if the source need to be saved.
 	 *
 	 * @param  data      Source data
 	 * @param  settings  Settings
+	 * @return bool      true means need to save and false means not.
 	 */
-	void (*save)(void *data, obs_data_t *settings);
+	bool (*save)(void *data, obs_data_t *settings);
 
 	/**
 	 * Called when loading a source from saved data.  This should be called

@@ -3373,16 +3373,18 @@ void obs_source_remove_active_child(obs_source_t *parent, obs_source_t *child)
 	}
 }
 
-void obs_source_save(obs_source_t *source)
+/* LEO: change return type from void to bool */
+bool obs_source_save(obs_source_t *source)
 {
 	if (!data_valid(source, "obs_source_save"))
-		return;
+		return false;
 
 	obs_source_dosignal(source, "source_save", "save");
 
 	if (source->info.save)
-		source->info.save(source->context.data,
+		return source->info.save(source->context.data,
 				source->context.settings);
+    return true;
 }
 
 void obs_source_load(obs_source_t *source)

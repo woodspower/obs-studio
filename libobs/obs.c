@@ -1862,7 +1862,14 @@ obs_data_t *obs_save_source(obs_source_t *source)
 	int        di_order    =
 		(int)obs_source_get_deinterlace_field_order(source);
 
-	obs_source_save(source);
+    /* LEO : allow source type to decide wether saving */
+	if (obs_source_save(source) == false) {
+        obs_data_release(settings);
+        obs_data_array_release(filters);
+        obs_data_release(source_data);
+        return NULL;
+    }
+
 	hotkeys = obs_hotkeys_save_source(source);
 
 	if (hotkeys) {

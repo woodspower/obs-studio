@@ -115,6 +115,7 @@ static void *scene_create(obs_data_t *settings, struct obs_source *source)
     /* max 10000 boxes in one obs scene */
     #define SCENE_CHILD_HASH_NUM  10000
     scene->sourceHash = hashInit(SCENE_CHILD_HASH_NUM);
+    scene->sceneHandle = NULL;
 
 	UNUSED_PARAMETER(settings);
 	return scene;
@@ -695,7 +696,7 @@ static void scene_load_item(struct obs_scene *scene, obs_data_t *item_data)
 		return;
 	}
     /* LEO add parent scene */
-    source->parent_scene = scene;
+    // source->parent_scene = scene;
 
 	item = obs_scene_add(scene, source);
 	if (!item) {
@@ -804,7 +805,8 @@ static void scene_load(void *data, obs_data_t *settings)
 	obs_data_array_release(items);
 }
 
-static void scene_save(void *data, obs_data_t *settings);
+/* LEO: change save func return type from void to bool */
+static bool scene_save(void *data, obs_data_t *settings);
 
 static void scene_save_item(obs_data_array_t *array,
 		struct obs_scene_item *item,
@@ -876,7 +878,8 @@ static void scene_save_item(obs_data_array_t *array,
 	obs_data_release(item_data);
 }
 
-static void scene_save(void *data, obs_data_t *settings)
+/* LEO: change save func return type from void to bool */
+static bool scene_save(void *data, obs_data_t *settings)
 {
 	struct obs_scene      *scene = data;
 	obs_data_array_t      *array  = obs_data_array_create();
@@ -901,6 +904,8 @@ static void scene_save(void *data, obs_data_t *settings)
 
 	obs_data_set_array(settings, "items", array);
 	obs_data_array_release(array);
+
+    return true;
 }
 
 static uint32_t scene_getwidth(void *data)
@@ -1371,6 +1376,18 @@ void obs_scene_release(obs_scene_t *scene)
 		obs_source_release(scene->source);
 }
 
+/* LEO: Add a handle into scene */
+void *obs_scene_get_handle(const obs_scene_t *scene)
+{
+	return scene ? scene->sceneHandle : NULL;
+}
+
+void obs_scene_set_handle(obs_scene_t *scene, void *handle)
+{
+	if (scene) 
+        scene->sceneHandle = handle;
+}
+
 obs_source_t *obs_scene_get_source(const obs_scene_t *scene)
 {
 	return scene ? scene->source : NULL;
@@ -1445,6 +1462,18 @@ void obs_scene_enum_items(obs_scene_t *scene,
 	if (!scene || !callback)
 		return;
 
+    /* LEO: bugfix for dead lock 
+       Dead lock1:
+       between obs: obs_scene_enum_item -> lock(video) -> obs_sceneitem_release -> lock(graphics)
+       and graphics:output_frame -> lock(graphics) -> scene_video_render -> lock(video)
+       Dead lock2:
+       between obs: obs_scene_enum_item -> full_lock(video) -> obs_context_data_remove -> lock(sources)
+       and graphics:tick_sources -> lock(sources) -> obs_source_video_tick -> scene_video_tick -> lock(video)
+    */
+    obs_enter_graphics();
+	pthread_mutex_lock(&obs->data.sources_mutex);
+
+
 	full_lock(scene);
 
 	item = scene->first_item;
@@ -1464,6 +1493,10 @@ void obs_scene_enum_items(obs_scene_t *scene,
 	}
 
 	full_unlock(scene);
+
+    /* LEO: bugfix for dead lock */
+	pthread_mutex_unlock(&obs->data.sources_mutex);
+    obs_leave_graphics();
 }
 
 static obs_sceneitem_t *sceneitem_get_ref(obs_sceneitem_t *si)
@@ -1691,7 +1724,6 @@ obs_sceneitem_t *obs_scene_add(obs_scene_t *scene, obs_source_t *source)
 	uint8_t stack[128];
 
     /* LEO: create a hash table for child sources */
-    scene->sourceHash = hashInit(SCENE_CHILD_HASH_NUM);
     /* insert box into hash table */
     hashSetP(scene->sourceHash, obs_source_get_name(source), (void*)source);
 
@@ -2632,12 +2664,14 @@ void obs_sceneitem_group_add_item(obs_sceneitem_t *group, obs_sceneitem_t *item)
 	/* ------------------------- */
 
 	full_lock(scene);
+//LEO:	
+    full_lock(groupscene);
 	remove_group_transform(group, item);
 	detach_sceneitem(item);
 
 	/* ------------------------- */
 
-	full_lock(groupscene);
+//LEO:	full_lock(groupscene);
 	last = groupscene->first_item;
 	if (last) {
 		for (;;) {
@@ -2905,6 +2939,11 @@ void obs_sceneitem_force_update_transform(obs_sceneitem_t *item)
 	if (!item)
 		return;
 
+/* LEO: WHY update not working? */
+/*
+	os_atomic_set_bool(&item->update_transform, false);
+    update_item_transform(item, false);
+*/
 	if (os_atomic_set_bool(&item->update_transform, false))
 		update_item_transform(item, false);
 }

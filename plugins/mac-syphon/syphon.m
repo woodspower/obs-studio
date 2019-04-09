@@ -997,11 +997,13 @@ static inline void syphon_save_internal(syphon_t s, obs_data_t *settings)
 	obs_data_set_string(settings, "uuid",     s->uuid.UTF8String);
 }
 
-static void syphon_save(void *data, obs_data_t *settings)
+/* LEO: change save func return type to bool */
+static bool syphon_save(void *data, obs_data_t *settings)
 {
 	@autoreleasepool {
 		syphon_save_internal(data, settings);
 	}
+    return true;
 }
 
 static inline void build_sprite(struct gs_vb_data *data, float fcx, float fcy,

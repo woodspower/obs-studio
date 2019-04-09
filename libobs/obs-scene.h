@@ -88,6 +88,8 @@ struct obs_scene {
 
     /* LEO: create a hash table for child sources */
 	hashTab               *sourceHash;
+    /* LEO: add a linked handle in scene */
+	void                  *sceneHandle;
 
 	bool                  is_group;
 	bool                  custom_size;

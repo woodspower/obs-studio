@@ -39,6 +39,7 @@ set(obs-filters_SOURCES
 	async-delay-filter.c
 	gpu-delay.c
 	crop-filter.c
+	text-filter.c
 	scale-filter.c
 	scroll-filter.c
 	chroma-key-filter.c

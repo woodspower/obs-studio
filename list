@@ -1,11 +1,15 @@
-./plugins/image-source/image-source.c:OBS_MODULE_USE_DEFAULT_LOCALE("image-source", "en-US")
-./plugins/image-source/CMakeLists.txt:project(image-source)
-./plugins/image-source/CMakeLists.txt:	set(image-source_PLATFORM_DEPS
-./plugins/image-source/CMakeLists.txt:set(image-source_SOURCES
-./plugins/image-source/CMakeLists.txt:	image-source.c
-./plugins/image-source/CMakeLists.txt:add_library(image-source MODULE
-./plugins/image-source/CMakeLists.txt:	${image-source_SOURCES})
-./plugins/image-source/CMakeLists.txt:target_link_libraries(image-source
-./plugins/image-source/CMakeLists.txt:	${image-source_PLATFORM_DEPS})
-./plugins/image-source/CMakeLists.txt:install_obs_plugin_with_data(image-source data)
-./plugins/CMakeLists.txt:add_subdirectory(image-source)
+./libobs/obs-internal.h:346:	pthread_mutex_t                 sources_mutex;
+./libobs/obs-video.c:57:	pthread_mutex_lock(&data->sources_mutex);
+./libobs/obs-video.c:70:	pthread_mutex_unlock(&data->sources_mutex);
+./libobs/obs.c:610:	if (pthread_mutex_init(&data->sources_mutex, &attr) != 0)
+./libobs/obs.c:674:	pthread_mutex_destroy(&data->sources_mutex);
+./libobs/obs.c:1401:	pthread_mutex_lock(&obs->data.sources_mutex);
+./libobs/obs.c:1420:	pthread_mutex_unlock(&obs->data.sources_mutex);
+./libobs/obs.c:1429:	pthread_mutex_lock(&obs->data.sources_mutex);
+./libobs/obs.c:1445:	pthread_mutex_unlock(&obs->data.sources_mutex);
+./libobs/obs.c:1542:			&obs->data.sources_mutex, obs_source_addref_safe_);
+./libobs/obs.c:1807:	pthread_mutex_lock(&data->sources_mutex);
+./libobs/obs.c:1835:	pthread_mutex_unlock(&data->sources_mutex);
+./libobs/obs.c:1938:	pthread_mutex_lock(&data->sources_mutex);
+./libobs/obs.c:1954:	pthread_mutex_unlock(&data->sources_mutex);
+./libobs/obs-source.c:205:			&obs->data.sources_mutex,

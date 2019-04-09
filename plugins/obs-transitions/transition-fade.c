@@ -80,14 +80,21 @@ static float mix_b(void *data, float t)
 	return t;
 }
 
+
+
+
+
 static bool fade_audio_render(void *data, uint64_t *ts_out,
 		struct obs_source_audio_mix *audio, uint32_t mixers,
 		size_t channels, size_t sample_rate)
 {
 	struct fade_info *fade = data;
+    /* LEO: BUGFIX */
+    return true;
 	return obs_transition_audio_render(fade->source, ts_out,
 		audio, mixers, channels, sample_rate, mix_a, mix_b);
 }
+
 
 struct obs_source_info fade_transition = {
 	.id = "fade_transition",

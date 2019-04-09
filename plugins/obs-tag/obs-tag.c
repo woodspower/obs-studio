@@ -1,10 +1,13 @@
 #include <obs-module.h>
+#include "tft.h"
 
 struct obs_box {
 	uint32_t color;
 
 	uint32_t width;
 	uint32_t height;
+
+	uint32_t synced;
 
 	obs_source_t *src;
 };
@@ -21,10 +24,12 @@ static void obs_box_update(void *data, obs_data_t *settings)
 	uint32_t color = (uint32_t)obs_data_get_int(settings, "color");
 	uint32_t width = (uint32_t)obs_data_get_int(settings, "width");
 	uint32_t height = (uint32_t)obs_data_get_int(settings, "height");
+	uint32_t synced = (uint32_t)obs_data_get_int(settings, "synced");
 
 	context->color = color;
 	context->width = width;
 	context->height = height;
+	context->synced = synced;
 }
 
 static void *obs_box_create(obs_data_t *settings, obs_source_t *source)
@@ -33,8 +38,15 @@ static void *obs_box_create(obs_data_t *settings, obs_source_t *source)
 
 	struct obs_box *context = bzalloc(sizeof(struct obs_box));
 	context->src = source;
+    obs_box_update(context, settings);
 
-	obs_box_update(context, settings);
+    printf("box_create: scene = %p\n", obs_source_get_scene(source));
+
+	// LEO: direct call obs_box_update will pass not fully initialed source
+    // should call obs_source_update if want use member of source
+	// obs_source_update(source, settings);
+
+	//UNUSED_PARAMETER(settings);
 
 	return context;
 }
@@ -99,10 +111,28 @@ static uint32_t obs_box_getheight(void *data)
 
 static void obs_box_defaults(obs_data_t *settings)
 {
-	obs_data_set_default_int(settings, "color", 0xFFFFFFFF);
+	obs_data_set_default_int(settings, "color", 0x80808080);
 	obs_data_set_default_int(settings, "width", 400);
 	obs_data_set_default_int(settings, "height", 400);
+	obs_data_set_default_int(settings, "synced", 0);
 }
+
+static bool obs_box_save(void *data, obs_data_t *settings)
+{
+	UNUSED_PARAMETER(settings);
+	UNUSED_PARAMETER(data);
+    /* DO NOT save any box info */
+    return false;
+}
+
+#if 0 
+static void obs_box_mouse_move(void *data, const struct obs_mouse_event *event, bool mouse_leave) 
+{ 
+  //  if (mouse_leave == false) return;
+    
+    printf("new box position is %d, %d\n", event->x, event->y);
+}
+#endif
 
 struct obs_source_info obs_box_info = {
 	.id             = "obs_box",
@@ -111,6 +141,7 @@ struct obs_source_info obs_box_info = {
 	.create         = obs_box_create,
 	.destroy        = obs_box_destroy,
 	.update         = obs_box_update,
+	.save           = obs_box_save,
 	.get_name       = obs_box_get_name,
 	.get_defaults   = obs_box_defaults,
 	.get_width      = obs_box_getwidth,

@@ -1,5 +1,4 @@
 #include <obs-module.h>
-//#include <obs-frontend-api.h>
 #include <util/threading.h>
 #include <util/platform.h>
 #include <util/darray.h>
@@ -76,6 +75,7 @@ enum behavior {
 struct sourceview {
 	obs_source_t *source;
     tft_buffer_t *tftBuffer;
+    obs_source_t *current_file_source;
 
 	bool randomize;
 	bool loop;
@@ -290,11 +290,14 @@ static inline bool item_valid(struct sourceview *ss)
 }
 
 
-static long get_boxref(const char *filepath)
+static long batch_getref(obs_source_t *source)
 {
+    const char *file;
+	obs_data_t *settings = obs_source_get_settings(source);
+	file = obs_data_get_string(settings, "file");
     /* find short name */
-    const char * shortpath = strrchr(filepath,'/');
-    if(shortpath == NULL) shortpath = filepath;
+    const char * shortpath = strrchr(file,'/');
+    if(shortpath == NULL) shortpath = file;
     else shortpath++; /*skip '/'*/
     
     /* skip ext name */
@@ -308,18 +311,24 @@ static long get_boxref(const char *filepath)
     }
 }
         
-void box_update(struct sourceview *ss, obs_source_t *source)
+static void do_batch_active(struct sourceview *ss, obs_source_t *source)
 {
-    const char *file;
     long ref;
 	if (!source || !ss)
 		return;
 
-	obs_data_t *settings = obs_source_get_settings(source);
-	file = obs_data_get_string(settings, "file");
-    ref = get_boxref(file);
-    printf("box_update(%li). file:%s\n",ref, file);
-    tft_batch_active(ss->tftBuffer, ref);
+    uint32_t width = obs_source_get_width(source);
+    uint32_t height = obs_source_get_height(source);
+    ref = batch_getref(source);
+    printf("do_batch_active(%li).\n", ref);
+
+    /* add scene to tftbuffer */
+    if (ss->tftBuffer->scene == NULL) {
+        ss->tftBuffer->scene = obs_source_get_scene(ss->source);
+        obs_scene_set_handle(ss->tftBuffer->scene, ss->tftBuffer);
+    }
+
+    tft_batch_active(ss->tftBuffer, ref, width, height);
 }
 
 static void do_transition(void *data, bool to_null, bool next)
@@ -351,8 +360,11 @@ static void do_transition(void *data, bool to_null, bool next)
 	if (!source)
 		return;
 
-    //LEO: test
-    box_update(ss, source);
+    //LEO: call tft to udpate box status in current batch
+    if (ss->current_file_source != source) {
+        ss->current_file_source = source;
+        do_batch_active(ss, source);
+    }
 
 	if (ss->use_cut)
 		obs_transition_set(ss->transition, source);
@@ -384,8 +396,6 @@ static void ss_update(void *data, obs_data_t *settings)
 	const char *behavior;
 	const char *mode;
 
-    /* add scene to tftbuffer */
-    ss->tftBuffer->scene = obs_source_get_scene(ss->source);
 
 	/* ------------------------------------- */
 	/* get settings data */
@@ -700,8 +710,11 @@ static void next_slide_hotkey(void *data, obs_hotkey_id id,
 	if (!ss->manual)
 		return;
 
-	if (pressed && obs_source_active(ss->source))
+	if (pressed && obs_source_active(ss->source)) {
+        /* LEO: update tft */
+        tft_batch_update_from_obs(ss->tftBuffer);
 		ss_next_slide(ss);
+    }
 }
 
 static void previous_slide_hotkey(void *data, obs_hotkey_id id,
@@ -715,13 +728,19 @@ static void previous_slide_hotkey(void *data, obs_hotkey_id id,
 	if (!ss->manual)
 		return;
 
-	if (pressed && obs_source_active(ss->source))
+	if (pressed && obs_source_active(ss->source)) {
+        /* LEO: update tft */
+        tft_batch_update_from_obs(ss->tftBuffer);
 		ss_previous_slide(ss);
+    }
 }
 
 static void ss_destroy(void *data)
 {
 	struct sourceview *ss = data;
+
+    /* LEO: release buffer and exit */
+    tft_exit(ss->tftBuffer);
 
 	obs_source_release(ss->transition);
 	free_files(&ss->files.da);
@@ -741,6 +760,8 @@ static void *ss_create(obs_data_t *settings, obs_source_t *source)
     scene = obs_scene_from_source(scenesrc);
 */
 	ss->source = source;
+
+    printf("ss_create: scene = %p\n", obs_source_get_scene(ss->source));
 
 	ss->manual = false;
 	ss->paused = false;
@@ -773,7 +794,10 @@ static void *ss_create(obs_data_t *settings, obs_source_t *source)
 
 
     ss->tftBuffer = tft_buffer_load(NULL, "/home/leo/datas/arch/main.json");
+    tft_buffer_print(ss->tftBuffer);
     assert(ss->tftBuffer != NULL);
+
+    ss->current_file_source = NULL;
 
 	pthread_mutex_init_value(&ss->mutex);
 	if (pthread_mutex_init(&ss->mutex, NULL) != 0)
@@ -1054,6 +1078,15 @@ static void ss_deactivate(void *data)
 		ss->pause_on_deactivate = true;
 }
 
+#if 0
+static void ss_mouse_move(void *data, const struct obs_mouse_event *event, bool mouse_leave)
+{
+    if (mouse_leave == false) 
+        return;
+    
+    printf("ss position is %d, %d\n", event->x, event->y);
+}
+#endif
 
 struct obs_source_info sourceview_info = {
 	.id                  = "sourceview",
