@@ -44,7 +44,7 @@ configure
 depcomp
 install-sh
 Makefile.in
-Makefile
+#Makefile
 
 #python
 __pycache__
@@ -96,3 +96,4 @@ tags
 .DS_Store
 */.DS_Store
 */**/.DS_Store
+.*
