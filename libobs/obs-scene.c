@@ -133,6 +133,34 @@ fail:
 
 static inline void full_lock(struct obs_scene *scene)
 {
+    /* LEO: bugfix for dead lock 
+       Dead lock1:
+       obs: obs_scene_enum_items -> lock(video) -> obs_sceneitem_release -> lock(graphics)
+       and graphics:output_frame -> lock(graphics) -> scene_video_render -> lock(video)
+       Change lock1 to:
+       obs: obs_scene_enum_items -> lock(video) -> obs_sceneitem_release -> lock(graphics)
+       and graphics:output_frame -> lock(graphics) -> scene_video_render -> nolock
+
+       Dead lock2:
+       obs: obs_scene_enum_items -> lock(video) -> obs_context_data_remove -> lock(sources)
+       and graphics:tick_sources -> lock(sources) -> obs_source_video_tick -> scene_video_tick -> lock(video)
+       Change lock2 to:
+       obs: obs_scene_enum_items -> lock(video) -> obs_context_data_remove -> lock(sources)
+       and graphics:tick_sources -> lock(sources) -> obs_source_video_tick -> scene_video_tick -> nolock
+
+       Dead lock3:
+       graphics: tick_sources -> lock(sources) -> ss_update -> add_file -> image_source_create -> lock(graphics)
+       and audio-io: audio_callback -> obs_source_enum_active_tree -> scene_enum_sources -> lock(video)
+
+       Dead lock4:
+       obs: obs_scene_enum_items -> lock(video) -> obs_sceneitem_release -> lock(graphics)
+       and graphics:render_display -> lock(graphics) -> obs_scene_enum_items -> lock(video)
+    */
+    /*
+	pthread_mutex_lock(&obs->data.sources_mutex);
+    obs_enter_graphics();
+    */
+
 	video_lock(scene);
 	audio_lock(scene);
 }
@@ -141,6 +169,12 @@ static inline void full_unlock(struct obs_scene *scene)
 {
 	audio_unlock(scene);
 	video_unlock(scene);
+
+    /* LEO: bugfix for dead lock */
+    /*
+    obs_leave_graphics();
+	pthread_mutex_unlock(&obs->data.sources_mutex);
+    */
 }
 
 static void set_visibility(struct obs_scene_item *item, bool vis);
@@ -149,9 +183,13 @@ static inline void detach_sceneitem(struct obs_scene_item *item);
 static inline void remove_without_release(struct obs_scene_item *item)
 {
 	item->removed = true;
-	set_visibility(item, false);
-	signal_item_remove(item);
-	detach_sceneitem(item);
+    /* LEO: bugfix for already detached items */
+    /* in case of someone called ungroup inside sceneitem_enum */
+    if (item->parent != NULL) {
+        set_visibility(item, false);
+        signal_item_remove(item);
+        detach_sceneitem(item);
+    }
 }
 
 static void remove_all_items(struct obs_scene *scene)
@@ -191,6 +229,36 @@ static void scene_destroy(void *data)
 	bfree(scene);
 }
 
+/* LEO: bugfix for dead lock */
+static void scene_enum_sources(void *data,
+		obs_source_enum_proc_t enum_callback,
+		void *param, bool active)
+{
+	struct obs_scene *scene = data;
+	struct obs_scene_item *item;
+	struct obs_scene_item *next = NULL;
+
+	full_lock(scene);
+	item = scene->first_item;
+    obs_sceneitem_addref(item);
+	full_unlock(scene);
+
+	while (item) {
+        /* next should be get before call callback() */
+        /* otherwise there would be deadloop if item changed */
+        full_lock(scene);
+		next = item->next;
+		obs_sceneitem_addref(next);
+        full_unlock(scene);
+
+		if (!active || os_atomic_load_long(&item->active_refs) > 0)
+			enum_callback(scene->source, item->source, param);
+
+		obs_sceneitem_release(item);
+        item = next;
+	}
+}
+#if 0
 static void scene_enum_sources(void *data,
 		obs_source_enum_proc_t enum_callback,
 		void *param, bool active)
@@ -215,6 +283,7 @@ static void scene_enum_sources(void *data,
 
 	full_unlock(scene);
 }
+#endif
 
 static void scene_enum_active_sources(void *data,
 		obs_source_enum_proc_t enum_callback,
@@ -563,12 +632,14 @@ static void scene_video_tick(void *data, float seconds)
 	struct obs_scene_item *item;
 
 	video_lock(scene);
+
 	item = scene->first_item;
 	while (item) {
 		if (item->item_render)
 			gs_texrender_reset(item->item_render);
 		item = item->next;
 	}
+
 	video_unlock(scene);
 
 	UNUSED_PARAMETER(seconds);
@@ -695,8 +766,6 @@ static void scene_load_item(struct obs_scene *scene, obs_data_t *item_data)
 				"found!", name);
 		return;
 	}
-    /* LEO add parent scene */
-    // source->parent_scene = scene;
 
 	item = obs_scene_add(scene, source);
 	if (!item) {
@@ -1453,6 +1522,42 @@ obs_sceneitem_t *obs_scene_find_sceneitem_by_id(obs_scene_t *scene, int64_t id)
 	return item;
 }
 
+/* LEO: bugfix for dead lock */
+/* Should NOT call obs_sceneitem_release or callbacks inside full_lock */
+void obs_scene_enum_items(obs_scene_t *scene,
+		bool (*callback)(obs_scene_t*, obs_sceneitem_t*, void*),
+		void *param)
+{
+	struct obs_scene_item *item;
+    struct obs_scene_item *next = NULL;
+
+	if (!scene || !callback)
+		return;
+
+	full_lock(scene);
+	item = scene->first_item;
+    obs_sceneitem_addref(item);
+	full_unlock(scene);
+
+	while (item) {
+        full_lock(scene);
+        /* next should be get before call callback() */
+        /* otherwise there would be deadloop if item changed */
+		next = item->next;
+		obs_sceneitem_addref(next);
+        full_unlock(scene);
+		if (!callback(scene, item, param)) {
+            //full_lock(scene);
+			obs_sceneitem_release(item);
+            //full_unlock(scene);
+			break;
+		}
+		obs_sceneitem_release(item);
+        item = next;
+	}
+
+}
+#if 0
 void obs_scene_enum_items(obs_scene_t *scene,
 		bool (*callback)(obs_scene_t*, obs_sceneitem_t*, void*),
 		void *param)
@@ -1461,18 +1566,6 @@ void obs_scene_enum_items(obs_scene_t *scene,
 
 	if (!scene || !callback)
 		return;
-
-    /* LEO: bugfix for dead lock 
-       Dead lock1:
-       between obs: obs_scene_enum_item -> lock(video) -> obs_sceneitem_release -> lock(graphics)
-       and graphics:output_frame -> lock(graphics) -> scene_video_render -> lock(video)
-       Dead lock2:
-       between obs: obs_scene_enum_item -> full_lock(video) -> obs_context_data_remove -> lock(sources)
-       and graphics:tick_sources -> lock(sources) -> obs_source_video_tick -> scene_video_tick -> lock(video)
-    */
-    obs_enter_graphics();
-	pthread_mutex_lock(&obs->data.sources_mutex);
-
 
 	full_lock(scene);
 
@@ -1493,11 +1586,8 @@ void obs_scene_enum_items(obs_scene_t *scene,
 	}
 
 	full_unlock(scene);
-
-    /* LEO: bugfix for dead lock */
-	pthread_mutex_unlock(&obs->data.sources_mutex);
-    obs_leave_graphics();
 }
+#endif
 
 static obs_sceneitem_t *sceneitem_get_ref(obs_sceneitem_t *si)
 {
@@ -2214,6 +2304,7 @@ bool obs_scene_reorder_items(obs_scene_t *scene,
 	return true;
 }
 
+/* LEO: how to? bugfix for dead lock */
 void obs_scene_atomic_update(obs_scene_t *scene,
 		obs_scene_atomic_update_func func, void *data)
 {
@@ -2226,6 +2317,20 @@ void obs_scene_atomic_update(obs_scene_t *scene,
 	full_unlock(scene);
 	obs_scene_release(scene);
 }
+#if 0
+void obs_scene_atomic_update(obs_scene_t *scene,
+		obs_scene_atomic_update_func func, void *data)
+{
+	if (!scene)
+		return;
+
+	obs_scene_addref(scene);
+	full_lock(scene);
+	func(data, scene);
+	full_unlock(scene);
+	obs_scene_release(scene);
+}
+#endif
 
 static inline bool crop_equal(const struct obs_sceneitem_crop *crop1,
 		const struct obs_sceneitem_crop *crop2)
@@ -2664,14 +2769,12 @@ void obs_sceneitem_group_add_item(obs_sceneitem_t *group, obs_sceneitem_t *item)
 	/* ------------------------- */
 
 	full_lock(scene);
-//LEO:	
-    full_lock(groupscene);
 	remove_group_transform(group, item);
 	detach_sceneitem(item);
 
 	/* ------------------------- */
 
-//LEO:	full_lock(groupscene);
+    full_lock(groupscene);
 	last = groupscene->first_item;
 	if (last) {
 		for (;;) {
@@ -2683,6 +2786,9 @@ void obs_sceneitem_group_add_item(obs_sceneitem_t *group, obs_sceneitem_t *item)
 		item->prev = last;
 	} else {
 		groupscene->first_item = item;
+        /* LEO: bugfix for moving item from one group to another */
+        /* item->prev will not be NULL in that case */
+        item->prev = NULL;
 	}
 	item->parent = groupscene;
 	item->next = NULL;

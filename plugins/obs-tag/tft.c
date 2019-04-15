@@ -618,14 +618,12 @@ static obs_sceneitem_t * group_update_or_create(obs_scene_t *scene, const char *
     /* try find exist group */
     /* bugfix: using obs_sceneitem_get_group will cause dead lock */
     // group = obs_sceneitem_get_group(scene, boxitem);
-#if 0
     group = obs_scene_get_group(scene, title);
     if (group == NULL) {
         /* create new group */
         group = obs_scene_add_group(scene, title);
 //        group = obs_scene_insert_group(scene, title, &boxitem, 1);
     }
-#endif
 /*
     obs_sceneitem_group_add_item(group, boxitem);
     obs_sceneitem_group_remove_item(group, boxitem);
@@ -634,10 +632,10 @@ static obs_sceneitem_t * group_update_or_create(obs_scene_t *scene, const char *
     obs_sceneitem_group_remove_item(group, boxitem);
     obs_sceneitem_group_add_item(group, boxitem);
     obs_sceneitem_set_visible(group, true);
+*/
     obs_sceneitem_group_add_item(group, boxitem);
     obs_sceneitem_group_add_item(group, txtitem);
     obs_sceneitem_set_visible(group, true);
-*/
     return group;
 }
 
@@ -645,7 +643,7 @@ static obs_sceneitem_t * group_update_or_create(obs_scene_t *scene, const char *
 void tft_exit(tft_buffer_t *tftBuffer)
 {
     /* BUG: force to remove all box and text in current scene */
-//	obs_scene_enum_items(tftBuffer->scene, _sceneitem_remove_all_group, NULL);
+	obs_scene_enum_items(tftBuffer->scene, _sceneitem_remove_all_group, NULL);
 	obs_scene_enum_items(tftBuffer->scene, _sceneitem_remove_all_box, NULL);
 }
 
@@ -667,7 +665,7 @@ void tft_batch_active(tft_buffer_t *tftBuffer, long ref, uint32_t batchW, uint32
 
     /* BUG: force to remove all box and text in current scene */
     /* SHOULD remove items before remove group */
-//	obs_scene_enum_items(tftBuffer->scene, _sceneitem_remove_all_group, NULL);
+	obs_scene_enum_items(tftBuffer->scene, _sceneitem_remove_all_group, NULL);
 	obs_scene_enum_items(tftBuffer->scene, _sceneitem_remove_all_box, NULL);
     
     LOGI("------TFT Batch ref: %ld  \n", ref);

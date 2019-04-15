@@ -770,6 +770,10 @@ static inline void output_frame(bool raw_active, const bool gpu_active)
 	memset(&frame, 0, sizeof(struct video_data));
 
 	profile_start(output_frame_gs_context_name);
+
+    /* LEO: bugfix for dead lock */
+	// pthread_mutex_lock(&obs->data.sources_mutex);
+
 	gs_enter_context(video->graphics);
 
 	profile_start(output_frame_render_video_name);
@@ -787,6 +791,10 @@ static inline void output_frame(bool raw_active, const bool gpu_active)
 	profile_end(output_frame_gs_flush_name);
 
 	gs_leave_context();
+
+    /* LEO: bugfix for dead lock */
+	// pthread_mutex_unlock(&obs->data.sources_mutex);
+
 	profile_end(output_frame_gs_context_name);
 
 	if (raw_active && frame_ready) {

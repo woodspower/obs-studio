@@ -1,15 +1,4 @@
-./libobs/obs-internal.h:346:	pthread_mutex_t                 sources_mutex;
-./libobs/obs-video.c:57:	pthread_mutex_lock(&data->sources_mutex);
-./libobs/obs-video.c:70:	pthread_mutex_unlock(&data->sources_mutex);
-./libobs/obs.c:610:	if (pthread_mutex_init(&data->sources_mutex, &attr) != 0)
-./libobs/obs.c:674:	pthread_mutex_destroy(&data->sources_mutex);
-./libobs/obs.c:1401:	pthread_mutex_lock(&obs->data.sources_mutex);
-./libobs/obs.c:1420:	pthread_mutex_unlock(&obs->data.sources_mutex);
-./libobs/obs.c:1429:	pthread_mutex_lock(&obs->data.sources_mutex);
-./libobs/obs.c:1445:	pthread_mutex_unlock(&obs->data.sources_mutex);
-./libobs/obs.c:1542:			&obs->data.sources_mutex, obs_source_addref_safe_);
-./libobs/obs.c:1807:	pthread_mutex_lock(&data->sources_mutex);
-./libobs/obs.c:1835:	pthread_mutex_unlock(&data->sources_mutex);
-./libobs/obs.c:1938:	pthread_mutex_lock(&data->sources_mutex);
-./libobs/obs.c:1954:	pthread_mutex_unlock(&data->sources_mutex);
-./libobs/obs-source.c:205:			&obs->data.sources_mutex,
+./UI/source-list-widget.cpp:42:	obs_scene_atomic_update(scene, [](void *data, obs_scene_t *scene)
+./UI/window-basic-source-select.cpp:161:		obs_scene_atomic_update(scene, AddSource, &data);
+./UI/window-basic-source-select.cpp:192:			obs_scene_atomic_update(scene, AddSource, &data);
+./UI/source-tree.cpp:1246:	obs_scene_atomic_update(scene, preUpdateScene, &updateScene);
