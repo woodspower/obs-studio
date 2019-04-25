@@ -569,6 +569,8 @@ struct obs_source {
 	struct obs_source_info          info;
     /* LEO add parent scene */
 	struct obs_scene                *parent_scene;
+    /* LEO add delay destroy capability */
+    uint32_t                        tobedel;
 	struct obs_weak_source          *control;
 
 	/* general exposed flags that can be set for the source */

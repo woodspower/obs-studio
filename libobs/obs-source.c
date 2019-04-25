@@ -145,6 +145,8 @@ bool obs_source_init(struct obs_source *source)
 
     /* LEO add parent scene */
     source->parent_scene = NULL;
+    /* LEO add delay destroy capability */
+    source->tobedel = 0;
 	source->user_volume = 1.0f;
 	source->volume = 1.0f;
 	source->sync_offset = 0;
@@ -630,6 +632,28 @@ void obs_source_addref(obs_source_t *source)
 	obs_ref_addref(&source->control->ref);
 }
 
+
+/* LEO add delay destroy capability */
+void obs_source_release(obs_source_t *source)
+{
+	if (!obs) {
+		blog(LOG_WARNING, "Tried to release a source when the OBS "
+		                  "core is shut down!");
+		return;
+	}
+
+	if (!source)
+		return;
+
+	obs_weak_source_t *control = source->control;
+	if (obs_ref_release(&control->ref)) {
+        /* LEO add delay destroy capability */
+        source->tobedel++;
+        blog(LOG_INFO, "source:%s, tobedel added to:%d",
+                        obs_source_get_name(source), source->tobedel);
+	}
+}
+#if 0
 void obs_source_release(obs_source_t *source)
 {
 	if (!obs) {
@@ -647,6 +671,7 @@ void obs_source_release(obs_source_t *source)
 		obs_weak_source_release(control);
 	}
 }
+#endif
 
 void obs_weak_source_addref(obs_weak_source_t *weak)
 {

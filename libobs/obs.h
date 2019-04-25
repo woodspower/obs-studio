@@ -649,6 +649,8 @@ EXPORT obs_source_t *obs_load_source(obs_data_t *data);
 /** Send a save signal to sources */
 /* LEO: change return type from void to bool */
 EXPORT bool obs_source_save(obs_source_t *source);
+/* LEO: reset the whole sourcetree widge */
+EXPORT void obs_scene_sourcetree_reset(obs_scene_t *scene);
 
 /** Send a load signal to sources */
 EXPORT void obs_source_load(obs_source_t *source);

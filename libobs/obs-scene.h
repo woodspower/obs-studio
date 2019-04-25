@@ -31,6 +31,8 @@ struct item_action {
 struct obs_scene_item {
 	volatile long         ref;
 	volatile bool         removed;
+    /* LEO: add tobedel for delay removement */
+    uint32_t              tobedel;
 
 	bool                  is_group;
 	bool                  update_transform;

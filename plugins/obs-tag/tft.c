@@ -16,6 +16,10 @@ leo, lili
 
 typedef struct vec2 vec2_t;
 
+static obs_sceneitem_t *null_obs_scene_find_source(obs_scene_t *scene, const char *name)
+{
+    return NULL;
+}
 
 static bool _sceneitem_set_invisible(obs_scene_t *scene, obs_sceneitem_t *item, void *param)
 {
@@ -37,7 +41,9 @@ static bool _sceneitem_remove_all_box(obs_scene_t *scene, obs_sceneitem_t *item,
     id = obs_source_get_id(source); 
     if (id != NULL && (strcmp("obs_box", id)==0 || 
                        strcmp("text_ft2_source",id)==0)) {
-        obs_sceneitem_remove(item);
+     //   obs_sceneitem_remove(item);
+        /* need deselect before delete */
+        //obs_sceneitem_select(item, false);
         obs_source_remove(source);
     }
 
@@ -52,6 +58,8 @@ static bool _sceneitem_remove_all_group(obs_scene_t *scene, obs_sceneitem_t *ite
     obs_source_t *source = obs_sceneitem_get_source(item);
     id = obs_source_get_id(source); 
     if (id != NULL && strcmp("group",id)==0 ) {
+        /* need deselect before delete */
+        //obs_sceneitem_select(item, false);
         obs_sceneitem_group_ungroup(item);
     }
 
@@ -223,6 +231,8 @@ static tft_batch_t * tft_batch_alloc(tft_buffer_t *buf, long ref)
         tmp->areas = NULL;
         tmp->buffer = buf;
         tmp->ref = ref;
+        tmp->width = 0;
+        tmp->height = 0;
         tmp->appArea = NULL;
         tmp->sceneArea = NULL;
         /* create area hashtab for seq inside batch */
@@ -357,7 +367,7 @@ void tft_area_update_from_source(tft_buffer_t *tftBuffer, obs_source_t *source)
     const char * fullname = obs_source_get_name(source);
     tft_batch_t * batch = tft_batch_get_from_ref(tftBuffer, tftBuffer->curRef);
     tft_area_t * area = tft_area_get_from_name(batch, fullname);
-    obs_sceneitem_t * sceneitem = obs_scene_find_source(tftBuffer->scene, fullname);
+    obs_sceneitem_t * sceneitem = null_obs_scene_find_source(tftBuffer->scene, fullname);
 
     if (sceneitem == NULL || area == NULL) {
         LOGE("tft_area_update_from_source called with NULL sceneitem or area.\n");
@@ -549,21 +559,23 @@ static obs_sceneitem_t * group_update_or_create(obs_scene_t *scene, const char *
     obs_sceneitem_t *txtitem = NULL;
     obs_sceneitem_t *group = NULL;
 
-    static char title[200];
-    snprintf(title, 199, "tit:%s", name);
+    static char tmpName[200];
+    snprintf(tmpName, 199, "tit:%s", name);
     /* try find exist box title */
-    txtitem = obs_scene_find_source(scene, title);
+    txtitem = null_obs_scene_find_source(scene, tmpName);
     if (txtitem == NULL) {
         /* create obs_box */
         obs_data_t *txtcfg = obs_data_create();
         obs_data_set_string(txtcfg, "text", name);
-        obs_data_set_int(txtcfg, "size", 12);
+        obs_data_t *font_obj = obs_data_create();
+        obs_data_set_int(font_obj, "size", 12);
+        obs_data_set_obj(txtcfg, "font", font_obj);
         obs_data_set_int(txtcfg, "color1", 0xFF000000);
         obs_data_set_int(txtcfg, "color2", 0xFF000000);
-        source = obs_source_create("text_ft2_source", title, txtcfg, NULL);
+        source = obs_source_create("text_ft2_source", tmpName, txtcfg, NULL);
         obs_data_release(txtcfg);
         txtitem = obs_scene_add(scene, source);
-        obs_sceneitem_set_pos(txtitem, &pos);
+        //obs_sceneitem_set_pos(txtitem, &pos);
         obs_source_release(source);
     }
     obs_sceneitem_set_visible(txtitem, true);
@@ -576,7 +588,7 @@ static obs_sceneitem_t * group_update_or_create(obs_scene_t *scene, const char *
     obs_data_set_int(settings, "height", height);
 
     /* try find exist box */
-    boxitem = obs_scene_find_source(scene, name);
+    boxitem = null_obs_scene_find_source(scene, name);
     if (boxitem == NULL) {
         /* create obs_box */
         source = obs_source_create("obs_box", name, settings, NULL);
@@ -618,11 +630,13 @@ static obs_sceneitem_t * group_update_or_create(obs_scene_t *scene, const char *
     /* try find exist group */
     /* bugfix: using obs_sceneitem_get_group will cause dead lock */
     // group = obs_sceneitem_get_group(scene, boxitem);
-    group = obs_scene_get_group(scene, title);
+    snprintf(tmpName, 199, "group:%s", name);
+    group = obs_scene_get_group(scene, tmpName);
     if (group == NULL) {
         /* create new group */
-        group = obs_scene_add_group(scene, title);
-//        group = obs_scene_insert_group(scene, title, &boxitem, 1);
+        group = obs_scene_add_group(scene, tmpName);
+        obs_sceneitem_set_pos(group, &pos);
+//        group = obs_scene_insert_group(scene, tmpName, &boxitem, 1);
     }
 /*
     obs_sceneitem_group_add_item(group, boxitem);
@@ -636,6 +650,7 @@ static obs_sceneitem_t * group_update_or_create(obs_scene_t *scene, const char *
     obs_sceneitem_group_add_item(group, boxitem);
     obs_sceneitem_group_add_item(group, txtitem);
     obs_sceneitem_set_visible(group, true);
+
     return group;
 }
 
@@ -648,7 +663,37 @@ void tft_exit(tft_buffer_t *tftBuffer)
 }
 
 /* new active which will recreate everything without using cache */
-void tft_batch_active(tft_buffer_t *tftBuffer, long ref, uint32_t batchW, uint32_t batchH)
+void tft_batch_set(tft_buffer_t *tftBuffer, long ref, uint32_t batchW, uint32_t batchH)
+{
+    hashLongTab *tftBatchHash;
+    hashLongItem *item;
+    tft_batch_t *tftBatch;
+
+    if(tftBuffer == NULL || tftBuffer->scene == NULL) {
+        LOGE("tft_batch_set: TFT BUFFER or SCENE is empty.\n");
+        return;
+    }
+
+    tftBatchHash = tftBuffer->batchHash;
+    item = hashLongGetP(tftBatchHash, ref);
+    if(item == NULL) {
+        LOGI("tft_batch_set:----NO MATCH TFT\n");
+        tftBatch = tft_batch_update(tftBuffer, ref, NULL, NULL);
+    }
+    else
+        tftBatch = (tft_batch_t *)item->pval;
+
+    /* Lock and process this batch */
+	pthread_mutex_lock(&tftBatch->mutex);
+    tftBatch->width = batchW;
+    tftBatch->height = batchH;
+	pthread_mutex_unlock(&tftBatch->mutex);
+
+    tftBuffer->setRef = ref;
+}
+
+/* new active which will recreate everything without using cache */
+void tft_batch_active(tft_buffer_t *tftBuffer)
 {
     obs_sceneitem_t *sceneitem;
     obs_source_t *source;
@@ -656,12 +701,19 @@ void tft_batch_active(tft_buffer_t *tftBuffer, long ref, uint32_t batchW, uint32
     tft_batch_t *tftBatch;
     hashLongTab *tftBatchHash;
     uint32_t width, height;
+    long ref;
 
     if(tftBuffer == NULL || tftBuffer->scene == NULL) {
         LOGE("TFT BUFFER or SCENE is empty.\n");
         return;
     }
-    tftBuffer->curRef = ref;
+
+    //LOGI("------tft_batch_active: curRef=%ld, setRef=%ld\n", tftBuffer->curRef, tftBuffer->setRef);
+    /* does it need update? */
+    if (tftBuffer->curRef == tftBuffer->setRef)
+        return;
+    tftBuffer->curRef = tftBuffer->setRef;
+    ref = tftBuffer->curRef;
 
     /* BUG: force to remove all box and text in current scene */
     /* SHOULD remove items before remove group */
@@ -691,14 +743,15 @@ void tft_batch_active(tft_buffer_t *tftBuffer, long ref, uint32_t batchW, uint32
 
     obs_data_t *settings = obs_data_create();
     obs_data_set_string(settings, "text", batchName);
-	obs_data_set_int(settings, "size", 16);
 	obs_data_set_int(settings, "color1", 0xFF000000);
 	obs_data_set_int(settings, "color2", 0xFF000000);
-    source = obs_source_create("text_ft2_source", "title", settings, NULL);
+    /* use defalt size = 32 */
+    source = obs_source_create("text_ft2_source", "batch", settings, NULL);
     obs_data_release(settings);
     sceneitem = obs_scene_add(tftBuffer->scene, source);
     obs_sceneitem_set_pos(sceneitem, &pos);
     obs_source_release(source);
+    //obs_sceneitem_select(sceneitem, false);
 
     tft_area_t *area, *area0;
     area0 = tftBatch->areas;
@@ -712,18 +765,27 @@ void tft_batch_active(tft_buffer_t *tftBuffer, long ref, uint32_t batchW, uint32
     do {
         /* do not need show app and scene */
         if (area->atype == TFT_AREA_TYPE_SUBAREA) {
-            width = (area->width!=0)?area->width:batchW;
-            height = (area->height!=0)?area->height:batchH;
+            width = (area->width!=0)?area->width:tftBatch->width;
+            height = (area->height!=0)?area->height:tftBatch->height;
             sceneitem = group_update_or_create(tftBuffer->scene, area->fullname, area->pos,
                                     width, height);
             LOGD("tft_batch:%ld actived sceneitem:%s,pos=(%f,%f),w-h=(%d,%d)\n",\
                     ref, area->fullname, area->pos.x, area->pos.y, width, height); 
             area->sceneitem = sceneitem;
+            
+            //obs_sceneitem_select(sceneitem, false);
         }
         area = area->next;
     }while(area != area0);
 
 	pthread_mutex_unlock(&tftBatch->mutex);
+
+    obs_scene_sourcetree_reset(tftBuffer->scene);
+/*
+    obs_sceneitem_set_order(sceneitem, OBS_ORDER_MOVE_TOP);
+	obs_scene_t *scene = obs_sceneitem_get_scene(sceneitem);
+	obs_source_t *sceneSource = obs_scene_get_source(scene);
+*/
 }
 
 
@@ -749,6 +811,7 @@ tft_buffer_t * tft_buffer_load(obs_scene_t *scene, const char *jsonfile)
     
     buffer->scene = scene;
     buffer->curRef = 0;
+    buffer->setRef = 0;
 
     /* init batchHash and batchLinker */
     buffer->batchHash = hashLongInit(TFT_BATCH_NUM_MAX);
@@ -821,7 +884,7 @@ void test_run(tft_buffer_t *tftBuffer)
     for (int i=0; i<3; i++) {
         LOGI("*************Run obs Buffer***************\n");
         for (long ref=2018030602102; ref<2018030602199; ref+=10) {
-            tft_batch_active(tftBuffer, ref, 1000, 600);
+            tft_batch_set(tftBuffer, ref, 1000, 600);
             sleep(1);
         }
         /* test tft update */

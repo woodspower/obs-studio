@@ -123,6 +123,8 @@ void SourceTreeItem::paintEvent(QPaintEvent *event)
 void SourceTreeItem::DisconnectSignals()
 {
 	sceneRemoveSignal.Disconnect();
+    /* LEO: add scene reset func */
+	sceneReorderSignal.Disconnect();
 	itemRemoveSignal.Disconnect();
 	deselectSignal.Disconnect();
 	visibleSignal.Disconnect();
@@ -189,6 +191,12 @@ void SourceTreeItem::ReconnectSignals()
 		QMetaObject::invokeMethod(this_->tree, "ReorderItems");
 	};
 
+	auto resetTree = [] (void *data, calldata_t*)
+	{
+		SourceTreeItem *this_ = reinterpret_cast<SourceTreeItem*>(data);
+		QMetaObject::invokeMethod(this_->tree, "ResetTree");
+	};
+
 	obs_scene_t *scene = obs_sceneitem_get_scene(sceneitem);
 	obs_source_t *sceneSource = obs_scene_get_source(scene);
 	signal_handler_t *signal = obs_source_get_signal_handler(sceneSource);
@@ -196,6 +204,8 @@ void SourceTreeItem::ReconnectSignals()
 	sceneRemoveSignal.Connect(signal, "remove", removeItem, this);
 	itemRemoveSignal.Connect(signal, "item_remove", removeItem, this);
 	visibleSignal.Connect(signal, "item_visible", itemVisible, this);
+    /* LEO: add scene reset */
+    sceneReorderSignal.Connect(signal, "reset_tree", resetTree, this);
 
 	if (obs_sceneitem_is_group(sceneitem)) {
 		obs_source_t *source = obs_sceneitem_get_source(sceneitem);
@@ -544,6 +554,14 @@ static inline void MoveItem(QVector<OBSSceneItem> &items, int oldIdx, int newIdx
 	items.remove(oldIdx);
 	items.insert(newIdx, item);
 }
+
+/* LEO: Scene reset func */
+void SourceTreeModel::ResetTree()
+{
+    SceneChanged();
+    return;
+}
+
 
 /* reorders list optimally with model reorder funcs */
 void SourceTreeModel::ReorderItems()

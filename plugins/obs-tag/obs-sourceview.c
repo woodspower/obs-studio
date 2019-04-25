@@ -328,7 +328,7 @@ static void do_batch_active(struct sourceview *ss, obs_source_t *source)
         obs_scene_set_handle(ss->tftBuffer->scene, ss->tftBuffer);
     }
 
-    tft_batch_active(ss->tftBuffer, ref, width, height);
+    tft_batch_set(ss->tftBuffer, ref, width, height);
 }
 
 static void do_transition(void *data, bool to_null, bool next)
@@ -830,6 +830,9 @@ static void ss_video_tick(void *data, float seconds)
 {
 	struct sourceview *ss = data;
 
+    /*LEO: chage tft update position from hotkey/enum to video tick */
+    tft_batch_active(ss->tftBuffer);
+
 	if (!ss->transition || !ss->slide_time)
 		return;
 
@@ -872,6 +875,7 @@ static void ss_video_tick(void *data, float seconds)
 
 		ss_next_slide(ss);
 	}
+
 }
 
 static inline bool ss_audio_render_(obs_source_t *transition, uint64_t *ts_out,

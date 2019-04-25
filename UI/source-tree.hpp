@@ -62,6 +62,8 @@ private:
 	SourceTree *tree;
 	OBSSceneItem sceneitem;
 	OBSSignal sceneRemoveSignal;
+    /* LEO: add scene reorder */
+	OBSSignal sceneReorderSignal;
 	OBSSignal itemRemoveSignal;
 	OBSSignal groupReorderSignal;
 	OBSSignal deselectSignal;
@@ -99,6 +101,8 @@ class SourceTreeModel : public QAbstractListModel {
 	void Clear();
 	void SceneChanged();
 	void ReorderItems();
+    /* LEO: reset all tree */
+	void ResetTree();
 
 	void Add(obs_sceneitem_t *item);
 	void Remove(obs_sceneitem_t *item);
@@ -166,6 +170,7 @@ public:
 
 public slots:
 	inline void ReorderItems() {GetStm()->ReorderItems();}
+	inline void ResetTree() {GetStm()->ResetTree();}
 	void Remove(OBSSceneItem item);
 	void GroupSelectedItems();
 	void UngroupSelectedGroups();

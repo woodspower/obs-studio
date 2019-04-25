@@ -155,6 +155,11 @@ static inline void full_lock(struct obs_scene *scene)
        Dead lock4:
        obs: obs_scene_enum_items -> lock(video) -> obs_sceneitem_release -> lock(graphics)
        and graphics:render_display -> lock(graphics) -> obs_scene_enum_items -> lock(video)
+
+       Dead lock5:
+       obs: obs_hotkey_trigger_routed_callback -> lock(obs-hotkeys) ->
+            obs_scene_enum_items -> obs_sceneitem_destroy -> obs_context_data_remove -> lock(context->mutex)==lock(sources)
+       and graphics:tick_sources -> lock(sources) -> obs_source_destroy -> obs_hotkey_unregister -> lock(obs->hotkeys.mutex)
     */
     /*
 	pthread_mutex_lock(&obs->data.sources_mutex);
@@ -230,6 +235,7 @@ static void scene_destroy(void *data)
 }
 
 /* LEO: bugfix for dead lock */
+#if 0
 static void scene_enum_sources(void *data,
 		obs_source_enum_proc_t enum_callback,
 		void *param, bool active)
@@ -258,7 +264,7 @@ static void scene_enum_sources(void *data,
         item = next;
 	}
 }
-#if 0
+#endif
 static void scene_enum_sources(void *data,
 		obs_source_enum_proc_t enum_callback,
 		void *param, bool active)
@@ -283,7 +289,6 @@ static void scene_enum_sources(void *data,
 
 	full_unlock(scene);
 }
-#endif
 
 static void scene_enum_active_sources(void *data,
 		obs_source_enum_proc_t enum_callback,
@@ -1489,7 +1494,9 @@ obs_sceneitem_t *obs_scene_find_source(obs_scene_t *scene, const char *name)
 
 	item = scene->first_item;
 	while (item) {
-		if (strcmp(item->source->context.name, name) == 0)
+        /* LEO: add delay destory capability */
+		//if (strcmp(item->source->context.name, name) == 0)
+		if (item->source->tobedel==0 && strcmp(item->source->context.name, name) == 0)
 			break;
 
 		item = item->next;
@@ -1524,6 +1531,7 @@ obs_sceneitem_t *obs_scene_find_sceneitem_by_id(obs_scene_t *scene, int64_t id)
 
 /* LEO: bugfix for dead lock */
 /* Should NOT call obs_sceneitem_release or callbacks inside full_lock */
+#if 0
 void obs_scene_enum_items(obs_scene_t *scene,
 		bool (*callback)(obs_scene_t*, obs_sceneitem_t*, void*),
 		void *param)
@@ -1557,7 +1565,7 @@ void obs_scene_enum_items(obs_scene_t *scene,
 	}
 
 }
-#if 0
+#endif
 void obs_scene_enum_items(obs_scene_t *scene,
 		bool (*callback)(obs_scene_t*, obs_sceneitem_t*, void*),
 		void *param)
@@ -1587,7 +1595,6 @@ void obs_scene_enum_items(obs_scene_t *scene,
 
 	full_unlock(scene);
 }
-#endif
 
 static obs_sceneitem_t *sceneitem_get_ref(obs_sceneitem_t *si)
 {
@@ -1908,6 +1915,19 @@ static void signal_parent(obs_scene_t *parent, const char *command,
 {
 	calldata_set_ptr(params, "scene", parent);
 	signal_handler_signal(parent->source->context.signals, command, params);
+}
+
+/* LEO: reset the whole sourcetree widge */
+void obs_scene_sourcetree_reset(obs_scene_t *scene)
+{
+	const char *command = NULL;
+	struct calldata params;
+	uint8_t stack[128];
+
+	command = "reset_tree";
+
+	calldata_init_fixed(&params, stack, sizeof(stack));
+	signal_parent(scene, command, &params);
 }
 
 void obs_sceneitem_select(obs_sceneitem_t *item, bool select)

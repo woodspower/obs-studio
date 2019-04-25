@@ -53,6 +53,8 @@ typedef struct tft_area {
 
 typedef struct tft_batch {
 	volatile long ref;
+    uint32_t width;
+    uint32_t height;
 	pthread_mutex_t  mutex;
     tft_area_t *appArea;
     tft_area_t *sceneArea;
@@ -67,14 +69,17 @@ typedef struct tft_batch {
 typedef struct tft_buffer {
 	char *name;
     obs_scene_t *scene;
-    /* current batch seq */
+    /* current batch ref */
     long curRef;
+    /* batch ref need to be set as current */
+    long setRef;
 	struct tft_batch *batchs;
     hashLongTab *batchHash;
 }tft_buffer_t;
 
 extern tft_buffer_t * tft_buffer_load(obs_scene_t *scene, const char *jsonfile);
-extern void tft_batch_active(tft_buffer_t *tftBuffer, long ref, uint32_t batchW, uint32_t batchH);
+extern void tft_batch_set(tft_buffer_t *tftBuffer, long ref, uint32_t batchW, uint32_t batchH);
+extern void tft_batch_active(tft_buffer_t *tftBuffer);
 extern tft_batch_t * tft_batch_update(tft_buffer_t *buf, long ref, char *appName, char *sceneName);
 extern void tft_area_update_from_source(tft_buffer_t *tftBuffer, obs_source_t *source);
 extern tft_area_t * tft_area_new(tft_batch_t *batch, enum tft_area_enum type,
