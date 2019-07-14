@@ -43,7 +43,7 @@ static bool _sceneitem_remove_all_box(obs_scene_t *scene, obs_sceneitem_t *item,
                        strcmp("text_ft2_source",id)==0)) {
      //   obs_sceneitem_remove(item);
         /* need deselect before delete */
-        //obs_sceneitem_select(item, false);
+        obs_sceneitem_select(item, false);
         obs_source_remove(source);
     }
 
@@ -59,7 +59,7 @@ static bool _sceneitem_remove_all_group(obs_scene_t *scene, obs_sceneitem_t *ite
     id = obs_source_get_id(source); 
     if (id != NULL && strcmp("group",id)==0 ) {
         /* need deselect before delete */
-        //obs_sceneitem_select(item, false);
+        obs_sceneitem_select(item, false);
         obs_sceneitem_group_ungroup(item);
     }
 
@@ -551,34 +551,61 @@ tft_batch_t * tft_batch_update(tft_buffer_t *buf, long ref, char *appName, char 
     return batch;
 }
 
-static obs_sceneitem_t * group_update_or_create(obs_scene_t *scene, const char *name, 
+static obs_sceneitem_t * group_update_or_create(obs_scene_t *scene, const char *fullname, const char *name, int seq,
                          struct vec2 pos, uint32_t width, uint32_t height)
 {
     obs_source_t *source = NULL;
     obs_sceneitem_t *boxitem = NULL;
     obs_sceneitem_t *txtitem = NULL;
+    obs_sceneitem_t *seqitem = NULL;
     obs_sceneitem_t *group = NULL;
+    struct vec2 tmpPos = {pos.x, pos.y+height};
 
     static char tmpName[200];
-    snprintf(tmpName, 199, "tit:%s", name);
+
     /* try find exist box title */
+    snprintf(tmpName, 199, "tit:%s", name);
     txtitem = null_obs_scene_find_source(scene, tmpName);
     if (txtitem == NULL) {
-        /* create obs_box */
+        /* create title text box */
         obs_data_t *txtcfg = obs_data_create();
         obs_data_set_string(txtcfg, "text", name);
         obs_data_t *font_obj = obs_data_create();
-        obs_data_set_int(font_obj, "size", 12);
+        obs_data_set_int(font_obj, "size", 20);
         obs_data_set_obj(txtcfg, "font", font_obj);
         obs_data_set_int(txtcfg, "color1", 0xFF000000);
         obs_data_set_int(txtcfg, "color2", 0xFF000000);
         source = obs_source_create("text_ft2_source", tmpName, txtcfg, NULL);
         obs_data_release(txtcfg);
         txtitem = obs_scene_add(scene, source);
-        //obs_sceneitem_set_pos(txtitem, &pos);
+//        obs_sceneitem_set_pos(txtitem, &pos);
         obs_source_release(source);
     }
+    obs_sceneitem_select(txtitem, false);
     obs_sceneitem_set_visible(txtitem, true);
+
+    /* try find exist box seq */
+    snprintf(tmpName, 199, "seq:%d", seq);
+    seqitem = null_obs_scene_find_source(scene, tmpName);
+    if (seqitem == NULL) {
+        /* create seq text box */
+        obs_data_t *txtcfg = obs_data_create();
+        snprintf(tmpName, 199, "%d", seq);
+        obs_data_set_string(txtcfg, "text", tmpName);
+        obs_data_t *font_obj = obs_data_create();
+        obs_data_set_int(font_obj, "size", 16);
+        obs_data_set_obj(txtcfg, "font", font_obj);
+        obs_data_set_int(txtcfg, "color1", 0xFF000000);
+        obs_data_set_int(txtcfg, "color2", 0xFF000000);
+        snprintf(tmpName, 199, "seq:%d", seq);
+        source = obs_source_create("text_ft2_source", tmpName, txtcfg, NULL);
+        obs_data_release(txtcfg);
+        seqitem = obs_scene_add(scene, source);
+//        obs_sceneitem_set_pos(seqitem, &tmpPos);
+        obs_source_release(source);
+    }
+    obs_sceneitem_select(seqitem, false);
+    obs_sceneitem_set_visible(seqitem, true);
 
 
     /* create settings for box create and update */
@@ -588,12 +615,12 @@ static obs_sceneitem_t * group_update_or_create(obs_scene_t *scene, const char *
     obs_data_set_int(settings, "height", height);
 
     /* try find exist box */
-    boxitem = null_obs_scene_find_source(scene, name);
+    boxitem = null_obs_scene_find_source(scene, fullname);
     if (boxitem == NULL) {
         /* create obs_box */
-        source = obs_source_create("obs_box", name, settings, NULL);
+        source = obs_source_create("obs_box", fullname, settings, NULL);
         if (source == NULL) {
-            LOGE("create obs_box:%s failed.\n", name);
+            LOGE("create obs_box:%s failed.\n", fullname);
             return NULL;
         }
         /* create opcity filter */
@@ -615,22 +642,23 @@ static obs_sceneitem_t * group_update_or_create(obs_scene_t *scene, const char *
     }
     else {
         /* update obs_obx settings */
-        LOGD("obs_box reused: %s\n", name);
+        LOGD("obs_box reused: %s\n", fullname);
         source = obs_sceneitem_get_source(boxitem);
         obs_source_update(source, settings);
         //SHOULD NOT call obs_source_release after obs_sceneitem_get_source
+        obs_sceneitem_select(boxitem, false);
         obs_sceneitem_set_visible(boxitem, true);
     }
     /* release settings data memory */
     obs_data_release(settings);
     /* update box pos */
-    obs_sceneitem_set_pos(boxitem, &pos);
+//    obs_sceneitem_set_pos(boxitem, &pos);
 
 
     /* try find exist group */
     /* bugfix: using obs_sceneitem_get_group will cause dead lock */
     // group = obs_sceneitem_get_group(scene, boxitem);
-    snprintf(tmpName, 199, "group:%s", name);
+    snprintf(tmpName, 199, "group:%s", fullname);
     group = obs_scene_get_group(scene, tmpName);
     if (group == NULL) {
         /* create new group */
@@ -649,6 +677,11 @@ static obs_sceneitem_t * group_update_or_create(obs_scene_t *scene, const char *
 */
     obs_sceneitem_group_add_item(group, boxitem);
     obs_sceneitem_group_add_item(group, txtitem);
+    obs_sceneitem_group_add_item(group, seqitem);
+    tmpPos.x= 0;
+    tmpPos.y= height - 20;
+    obs_sceneitem_set_pos(seqitem, &tmpPos);
+    //obs_sceneitem_select(group, false);
     obs_sceneitem_set_visible(group, true);
 
     return group;
@@ -743,7 +776,7 @@ void tft_batch_active(tft_buffer_t *tftBuffer)
 
     obs_data_t *settings = obs_data_create();
     obs_data_set_string(settings, "text", batchName);
-	obs_data_set_int(settings, "color1", 0xFF000000);
+	obs_data_set_int(settings, "color1", 0xFFFFFFFF);
 	obs_data_set_int(settings, "color2", 0xFF000000);
     /* use defalt size = 32 */
     source = obs_source_create("text_ft2_source", "batch", settings, NULL);
@@ -751,32 +784,29 @@ void tft_batch_active(tft_buffer_t *tftBuffer)
     sceneitem = obs_scene_add(tftBuffer->scene, source);
     obs_sceneitem_set_pos(sceneitem, &pos);
     obs_source_release(source);
-    //obs_sceneitem_select(sceneitem, false);
+    obs_sceneitem_select(sceneitem, false);
 
     tft_area_t *area, *area0;
     area0 = tftBatch->areas;
     area = area0;
     if(area == NULL) {
         LOGD("tft_batch_active called with NULL area\n");
-        pthread_mutex_unlock(&tftBatch->mutex);
-        return;
     }
-    
-    do {
-        /* do not need show app and scene */
-        if (area->atype == TFT_AREA_TYPE_SUBAREA) {
-            width = (area->width!=0)?area->width:tftBatch->width;
-            height = (area->height!=0)?area->height:tftBatch->height;
-            sceneitem = group_update_or_create(tftBuffer->scene, area->fullname, area->pos,
-                                    width, height);
-            LOGD("tft_batch:%ld actived sceneitem:%s,pos=(%f,%f),w-h=(%d,%d)\n",\
-                    ref, area->fullname, area->pos.x, area->pos.y, width, height); 
-            area->sceneitem = sceneitem;
-            
-            //obs_sceneitem_select(sceneitem, false);
-        }
-        area = area->next;
-    }while(area != area0);
+    else {
+        do {
+            /* only need show subareas, do not need show app and scene */
+            if (area->atype == TFT_AREA_TYPE_SUBAREA) {
+                width = (area->width!=0)?area->width:tftBatch->width;
+                height = (area->height!=0)?area->height:tftBatch->height;
+                sceneitem = group_update_or_create(tftBuffer->scene, area->fullname, area->name, area->seq, area->pos,
+                                        width, height);
+                LOGD("tft_batch:%ld actived sceneitem:%s,pos=(%f,%f),w-h=(%d,%d)\n",\
+                        ref, area->fullname, area->pos.x, area->pos.y, width, height); 
+                area->sceneitem = sceneitem;
+            }
+            area = area->next;
+        }while(area != area0);
+    }
 
 	pthread_mutex_unlock(&tftBatch->mutex);
 

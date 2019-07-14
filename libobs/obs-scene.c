@@ -50,6 +50,8 @@ static const char *obs_scene_signals[] = {
 	"void item_add(ptr scene, ptr item)",
 	"void item_remove(ptr scene, ptr item)",
 	"void reorder(ptr scene)",
+    /* LEO add scene_reset */
+	"void reset_tree(ptr scene)",
 	"void item_visible(ptr scene, ptr item, bool visible)",
 	"void item_select(ptr scene, ptr item)",
 	"void item_deselect(ptr scene, ptr item)",
