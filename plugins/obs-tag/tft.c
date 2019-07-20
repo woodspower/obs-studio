@@ -46,6 +46,9 @@ static bool _sceneitem_remove_all_box(obs_scene_t *scene, obs_sceneitem_t *item,
         obs_sceneitem_select(item, false);
         obs_source_remove(source);
     }
+    else
+        /* lock other background sceneitem like sourceview item */
+        obs_sceneitem_set_locked(item, true);
 
     UNUSED_PARAMETER(scene);
     UNUSED_PARAMETER(param);
@@ -470,14 +473,35 @@ static bool __area_update_from_sceneitem(obs_scene_t *scene, obs_sceneitem_t *it
     tft_batch_t  *tftBatch;
     source = obs_sceneitem_get_source(item); 
     id = obs_source_get_id(source);
-    /* LEO: bug, should not use fullname */
     fullname = obs_source_get_name(source);
-    if (id == NULL || strcmp("obs_box", id)!=0 || !obs_sceneitem_visible(item)) 
-        return true;
 
     obs_sceneitem_get_pos(item, &pos);
     uint32_t height = obs_source_get_height(source);
     uint32_t width = obs_source_get_width(source);
+    LOGD("__area_update_from_sceneitem: name=%s, x=%f, y=%f, w=%d, h=%d\n", 
+          fullname, pos.x, pos.y, width, height);
+
+#if 0
+    /* group need to be ungroup and interate inside */
+    if (id != NULL && strcmp("group",id)==0 ) {
+        obs_scene_t *subscene =
+            obs_sceneitem_group_get_scene(item);
+        obs_scene_enum_items(subscene, __area_update_from_sceneitem, param);
+    }
+#endif
+
+
+    /* LEO: bug, should not use fullname */
+    /* only group need to be saved */
+    if (id == NULL || strcmp("group", id)!=0 || !obs_sceneitem_visible(item)) 
+        return true;
+    /* only group name pattern is "group:xxxx" need to be saved */
+    int len = strlen("group:");
+    if (strncmp("group:", fullname, len) != 0)
+        return true;
+    fullname = fullname + len;
+        
+
 
     tftBatch = tft_batch_update(tftBuffer, tftBuffer->curRef, NULL, NULL);
     tft_area_t * area = tft_area_get_from_name(tftBatch, fullname);
@@ -488,13 +512,14 @@ static bool __area_update_from_sceneitem(obs_scene_t *scene, obs_sceneitem_t *it
     }
     else {
         /* update area position from sceneitem */
+        /* area is inside group, it's relative pos is always (0,0) */
         pthread_mutex_lock(&tftBatch->mutex);
         area->pos = pos;
         area->width = width;
         area->height = height;
         pthread_mutex_unlock(&tftBatch->mutex);
 
-        LOGD("tft_area: %s, update_from_source: x=%f, y=%f, w=%d, h=%d\n", 
+        LOGD("tft_area: %s, update_from_obs: x=%f, y=%f, w=%d, h=%d\n", 
               fullname, pos.x, pos.y, width, height);
     }
 
@@ -785,6 +810,7 @@ void tft_batch_active(tft_buffer_t *tftBuffer)
     obs_sceneitem_set_pos(sceneitem, &pos);
     obs_source_release(source);
     obs_sceneitem_select(sceneitem, false);
+    obs_sceneitem_set_locked(sceneitem, true);
 
     tft_area_t *area, *area0;
     area0 = tftBatch->areas;
