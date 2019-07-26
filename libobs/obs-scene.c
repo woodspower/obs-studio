@@ -660,6 +660,12 @@ static void update_transforms_and_prune_sources(obs_scene_t *scene,
 	bool rebuild_group = group_sceneitem &&
 		os_atomic_load_bool(&group_sceneitem->update_group_resize);
 
+    /* LEO: 
+    rebuild_group = true;
+    if(group_sceneitem && os_atomic_load_bool(&group_sceneitem->update_group_resize))
+        blog(LOG_WARNING, "LEO: flag:%d, item:%p", rebuild_group, item);
+    */
+
 	while (item) {
 		if (obs_source_removed(item->source)) {
 			struct obs_scene_item *del_item = item;
@@ -691,6 +697,8 @@ static void update_transforms_and_prune_sources(obs_scene_t *scene,
 		item = item->next;
 	}
 
+    //blog(LOG_WARNING, "LEO: rebuild_group:%d, group_sceneitem:%p", rebuild_group, group_sceneitem);
+
 	if (rebuild_group && group_sceneitem)
 		resize_group(group_sceneitem);
 }
@@ -709,6 +717,12 @@ static void scene_video_render(void *data, gs_effect_t *effect)
 		update_transforms_and_prune_sources(scene, &remove_items.da,
 				NULL);
 	}
+
+/* LEO: why not call resize if the scene is a group? */
+#if 0
+    blog(LOG_WARNING, "LEO: scene_video_render");
+    update_transforms_and_prune_sources(scene, &remove_items.da, NULL);
+#endif
 
 	gs_blend_state_push();
 	gs_reset_blend_state();
@@ -1226,6 +1240,23 @@ const struct obs_source_info scene_info =
 	.enum_active_sources = scene_enum_active_sources,
 	.enum_all_sources = scene_enum_all_sources
 };
+
+/* LEO: add group update to support resize */
+#if 0
+static void scene_update(void *data, obs_data_t *settings)
+{
+	struct obs_box *context = data;
+	uint32_t height = (uint32_t)obs_data_get_int(settings, "height");
+	uint32_t synced = (uint32_t)obs_data_get_int(settings, "synced");
+
+	context->color = color;
+	context->width = width;
+	context->height = height;
+	context->synced = synced;
+}
+    /* LEO: add group update to support resize */
+	.update        = scene_update,
+#endif
 
 const struct obs_source_info group_info =
 {
@@ -2602,6 +2633,8 @@ static void resize_group(obs_sceneitem_t *group)
 	struct vec2 maxv;
 	struct vec2 scale;
 
+    //blog(LOG_WARNING, "LEO: resize_group");
+
 	if (os_atomic_load_long(&group->defer_group_resize) > 0)
 		return;
 
@@ -3029,6 +3062,14 @@ bool obs_scene_reorder_items2(obs_scene_t *scene,
 obs_sceneitem_t *obs_sceneitem_get_group(obs_scene_t *scene,
 		obs_sceneitem_t *group_subitem)
 {
+/* LEO: if item is group, return item itself */
+#if 0
+	if (group_subitem->is_group) {
+		blog(LOG_ERROR, "LEO: I am group");
+		return group_subitem;
+    }
+#endif
+
 	if (!scene || !group_subitem || group_subitem->is_group)
 		return NULL;
 

@@ -463,44 +463,53 @@ tft_batch_t * tft_batch_load(json_t *unit, tft_buffer_t *buffer)
     return tmp;
 }
 
-static bool __area_update_from_sceneitem(obs_scene_t *scene, obs_sceneitem_t *item, void *param)
+static bool __group_get_boxitem(obs_scene_t *scene, obs_sceneitem_t *item, void *param)
+{
+    const char *id;
+    obs_source_t **ppSource = param;
+    obs_source_t *source = obs_sceneitem_get_source(item);
+    id = obs_source_get_id(source); 
+
+    if (ppSource != NULL && id != NULL && strcmp("obs_box", id) == 0) {
+        *ppSource = source;
+        return true;
+    }
+
+    UNUSED_PARAMETER(scene);
+    UNUSED_PARAMETER(param);
+    /* not found obs_box item */
+    return false;
+}
+
+static bool __area_update_from_sceneitem(obs_scene_t *scene, obs_sceneitem_t *groupitem, void *param)
 {
     const char *id;
     const char *fullname;
     obs_source_t *source;
     struct vec2 pos;
+	struct vec2 scale;
     tft_buffer_t *tftBuffer = param;
     tft_batch_t  *tftBatch;
-    source = obs_sceneitem_get_source(item); 
+    source = obs_sceneitem_get_source(groupitem); 
     id = obs_source_get_id(source);
     fullname = obs_source_get_name(source);
 
-    obs_sceneitem_get_pos(item, &pos);
-    uint32_t height = obs_source_get_height(source);
-    uint32_t width = obs_source_get_width(source);
-    LOGD("__area_update_from_sceneitem: name=%s, x=%f, y=%f, w=%d, h=%d\n", 
-          fullname, pos.x, pos.y, width, height);
-
-#if 0
-    /* group need to be ungroup and interate inside */
-    if (id != NULL && strcmp("group",id)==0 ) {
-        obs_scene_t *subscene =
-            obs_sceneitem_group_get_scene(item);
-        obs_scene_enum_items(subscene, __area_update_from_sceneitem, param);
-    }
-#endif
+    obs_sceneitem_get_pos(groupitem, &pos);
+    obs_sceneitem_get_scale(groupitem, &scale);
+    uint32_t height = (uint32_t)((float)obs_source_get_height(source) * scale.x);
+    uint32_t width  = (uint32_t)((float)obs_source_get_width(source) * scale.y);
+    LOGD("__area_update_from_sceneitem: name=%s, x=%f, y=%f, scale.x=%f, scale.y=%f, w=%d, h=%d\n", 
+          fullname, pos.x, pos.y, scale.x, scale.y, width, height);
 
 
-    /* LEO: bug, should not use fullname */
     /* only group need to be saved */
-    if (id == NULL || strcmp("group", id)!=0 || !obs_sceneitem_visible(item)) 
+    if (id == NULL || strcmp("group", id)!=0 || !obs_sceneitem_visible(groupitem)) 
         return true;
     /* only group name pattern is "group:xxxx" need to be saved */
     int len = strlen("group:");
     if (strncmp("group:", fullname, len) != 0)
         return true;
     fullname = fullname + len;
-        
 
 
     tftBatch = tft_batch_update(tftBuffer, tftBuffer->curRef, NULL, NULL);
@@ -608,6 +617,8 @@ static obs_sceneitem_t * group_update_or_create(obs_scene_t *scene, const char *
     }
     obs_sceneitem_select(txtitem, false);
     obs_sceneitem_set_visible(txtitem, true);
+    /* only leave group unlocked */
+    obs_sceneitem_set_locked(txtitem, true);
 
     /* try find exist box seq */
     snprintf(tmpName, 199, "seq:%d", seq);
@@ -631,6 +642,8 @@ static obs_sceneitem_t * group_update_or_create(obs_scene_t *scene, const char *
     }
     obs_sceneitem_select(seqitem, false);
     obs_sceneitem_set_visible(seqitem, true);
+    /* only leave group unlocked */
+    obs_sceneitem_set_locked(seqitem, true);
 
 
     /* create settings for box create and update */
@@ -673,6 +686,8 @@ static obs_sceneitem_t * group_update_or_create(obs_scene_t *scene, const char *
         //SHOULD NOT call obs_source_release after obs_sceneitem_get_source
         obs_sceneitem_select(boxitem, false);
         obs_sceneitem_set_visible(boxitem, true);
+        /* only leave group unlocked */
+        obs_sceneitem_set_locked(boxitem, true);
     }
     /* release settings data memory */
     obs_data_release(settings);
