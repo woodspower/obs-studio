@@ -181,7 +181,13 @@ bool AddNew(QWidget *parent, const char *id, const char *name,
 				QTStr("NameExists.Text"));
 
 	} else {
-		source = obs_source_create(id, name, NULL, nullptr);
+        /* LEO: add scene pointer into settings */
+        obs_data_t *settings = obs_data_create();
+        obs_data_set_double(settings, "scene", (double)(long)(obs_scene_t *)scene);
+		source = obs_source_create(id, name, settings, nullptr);
+        obs_data_release(settings);
+
+		//source = obs_source_create(id, name, NULL, nullptr);
 
 		if (source) {
 			AddSourceData data;

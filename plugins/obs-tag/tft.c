@@ -498,8 +498,8 @@ static bool __area_update_from_sceneitem(obs_scene_t *scene, obs_sceneitem_t *gr
     obs_sceneitem_get_scale(groupitem, &scale);
     uint32_t height = (uint32_t)((float)obs_source_get_height(source) * scale.x);
     uint32_t width  = (uint32_t)((float)obs_source_get_width(source) * scale.y);
-    LOGD("__area_update_from_sceneitem: name=%s, x=%f, y=%f, scale.x=%f, scale.y=%f, w=%d, h=%d\n", 
-          fullname, pos.x, pos.y, scale.x, scale.y, width, height);
+    LOGD("__area_update_from_sceneitem: id=%s, name=%s, x=%f, y=%f, scale.x=%f, scale.y=%f, w=%d, h=%d\n", 
+         id, fullname, pos.x, pos.y, scale.x, scale.y, width, height);
 
 
     /* only group need to be saved */
@@ -585,6 +585,46 @@ tft_batch_t * tft_batch_update(tft_buffer_t *buf, long ref, char *appName, char 
     return batch;
 }
 
+static obs_sceneitem_t * boxgroup_create(obs_scene_t *scene, const char *fullname, const char *name, int seq,
+                         struct vec2 pos, uint32_t width, uint32_t height)
+{
+    obs_source_t *source = NULL;
+    obs_sceneitem_t *boxitem = NULL;
+
+    /* create settings for box create and update */
+    obs_data_t *settings = obs_data_create();
+    obs_data_set_int(settings, "color", 0xff808080);
+    obs_data_set_int(settings, "width", width);
+    obs_data_set_int(settings, "height", height);
+    obs_data_set_double(settings, "scene", (double)(long)scene);
+    obs_data_set_string(settings, "fullname", fullname);
+    obs_data_set_string(settings, "name", name);
+    obs_data_set_int(settings, "seq", seq);
+    obs_data_set_double(settings, "x", (double)pos.x);
+    obs_data_set_double(settings, "y", (double)pos.y);
+
+    /* create obs_box */
+    source = obs_source_create("obs_box", fullname, settings, NULL);
+    if (source == NULL) {
+        LOGE("create obs_box:%s failed.\n", fullname);
+        return NULL;
+    }
+
+/*LEO: should find obs_box in boxgroup instead of scene */
+    boxitem = obs_scene_find_source(scene, fullname);
+    LOGD("create obs_box:%s success in scene:%p as item:%p.\n", fullname, scene, boxitem);
+
+    /* add box into scene */
+#if 0
+    boxitem = obs_scene_add(scene, source);
+    obs_source_release(source);
+#endif
+
+    /* release settings data memory */
+    obs_data_release(settings);
+
+    return boxitem;
+}
 static obs_sceneitem_t * group_update_or_create(obs_scene_t *scene, const char *fullname, const char *name, int seq,
                          struct vec2 pos, uint32_t width, uint32_t height)
 {
@@ -651,6 +691,12 @@ static obs_sceneitem_t * group_update_or_create(obs_scene_t *scene, const char *
     obs_data_set_int(settings, "color", 0xff808080);
     obs_data_set_int(settings, "width", width);
     obs_data_set_int(settings, "height", height);
+    obs_data_set_double(settings, "scene", (double)(long)scene);
+    obs_data_set_string(settings, "fullname", fullname);
+    obs_data_set_string(settings, "name", name);
+    obs_data_set_int(settings, "seq", seq);
+    obs_data_set_double(settings, "x", (double)pos.x);
+    obs_data_set_double(settings, "y", (double)pos.y);
 
     /* try find exist box */
     boxitem = null_obs_scene_find_source(scene, fullname);
@@ -839,7 +885,7 @@ void tft_batch_active(tft_buffer_t *tftBuffer)
             if (area->atype == TFT_AREA_TYPE_SUBAREA) {
                 width = (area->width!=0)?area->width:tftBatch->width;
                 height = (area->height!=0)?area->height:tftBatch->height;
-                sceneitem = group_update_or_create(tftBuffer->scene, area->fullname, area->name, area->seq, area->pos,
+                sceneitem = boxgroup_create(tftBuffer->scene, area->fullname, area->name, area->seq, area->pos,
                                         width, height);
                 LOGD("tft_batch:%ld actived sceneitem:%s,pos=(%f,%f),w-h=(%d,%d)\n",\
                         ref, area->fullname, area->pos.x, area->pos.y, width, height); 
