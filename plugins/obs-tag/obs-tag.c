@@ -127,8 +127,7 @@ static void obs_box_update(void *data, obs_data_t *settings)
     context->height = (uint32_t)obs_data_get_int(settings, "height");
 	context->synced = (uint32_t)obs_data_get_int(settings, "synced");
 
-	context->fullname = obs_data_get_string(settings, "fullname");
-	context->name = obs_data_get_string(settings, "name");
+//	context->name = obs_data_get_string(settings, "name");
 	context->seq = obs_data_get_int(settings, "seq");
 	context->pos.x = (float)obs_data_get_double(settings, "x");
 	context->pos.y = (float)obs_data_get_double(settings, "y");
@@ -147,6 +146,8 @@ static void *obs_box_create(obs_data_t *settings, obs_source_t *source)
 
 	struct obs_box *context = bzalloc(sizeof(struct obs_box));
 	context->src = source;
+	context->fullname = obs_source_get_name(source);
+	context->name = obs_source_get_name(source);
 //	obs_data_set_default_obj(settings, "scene", NULL);
 
     obs_box_update(context, settings);
@@ -186,6 +187,9 @@ static obs_properties_t *obs_box_properties(void *unused)
 
 	obs_properties_add_int(props, "height",
 		obs_module_text("Box.Height"), 0, 4096, 1);
+
+	obs_properties_add_int(props, "seq",
+		obs_module_text("Box.Seq"), 0, 100, 1);
 
 	return props;
 }

@@ -24,6 +24,9 @@
 struct AddSourceData {
 	obs_source_t *source;
 	bool visible;
+    /* LEO: check if added or not */
+    /* This will decide if free source or not */
+	bool result;
 };
 
 bool OBSBasicSourceSelect::EnumSources(void *data, obs_source_t *source)
@@ -109,6 +112,15 @@ static void AddSource(void *_data, obs_scene_t *scene)
 	obs_sceneitem_t *sceneitem;
 
 	sceneitem = obs_scene_add(scene, data->source);
+    /* LEO: check if added or not */
+    /* This will decide if free source or not */
+	if(sceneitem == NULL) {
+        printf ("Add source failed \n");
+        data->result = false;
+        return;
+    }
+    data->result = true;
+
 	obs_sceneitem_set_visible(sceneitem, data->visible);
 }
 
@@ -200,11 +212,17 @@ bool AddNew(QWidget *parent, const char *id, const char *name,
 
 			newSource = source;
 
+            /* LEO: check if added or not */
+            /* This will decide if free source or not */
+            if (data.result == true)
+                obs_source_release(source);
+
 			success = true;
 		}
 	}
 
-	obs_source_release(source);
+	//LEO: move ahead 
+    //obs_source_release(source);
 	return success;
 }
 

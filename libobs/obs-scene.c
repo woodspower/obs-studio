@@ -1781,6 +1781,8 @@ static obs_sceneitem_t *obs_scene_add_internal(obs_scene_t *scene,
 		return NULL;
 	}
     /* LEO add parent scene */
+    if (source->parent_scene == scene)
+		return NULL;
     source->parent_scene = scene;
 
 	item = bzalloc(sizeof(struct obs_scene_item));
@@ -1852,6 +1854,11 @@ obs_sceneitem_t *obs_scene_add(obs_scene_t *scene, obs_source_t *source)
 	obs_sceneitem_t *item = obs_scene_add_internal(scene, source, NULL);
 	struct calldata params;
 	uint8_t stack[128];
+
+    /* LEO: add support of obs_box plugin. */
+    /* If source add failed, return NULL */
+    if (item == NULL)
+        return NULL;
 
     /* LEO: create a hash table for child sources */
     /* insert box into hash table */

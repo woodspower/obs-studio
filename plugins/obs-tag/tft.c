@@ -597,7 +597,6 @@ static obs_sceneitem_t * boxgroup_create(obs_scene_t *scene, const char *fullnam
     obs_data_set_int(settings, "width", width);
     obs_data_set_int(settings, "height", height);
     obs_data_set_double(settings, "scene", (double)(long)scene);
-    obs_data_set_string(settings, "fullname", fullname);
     obs_data_set_string(settings, "name", name);
     obs_data_set_int(settings, "seq", seq);
     obs_data_set_double(settings, "x", (double)pos.x);
