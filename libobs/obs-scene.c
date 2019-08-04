@@ -1781,8 +1781,6 @@ static obs_sceneitem_t *obs_scene_add_internal(obs_scene_t *scene,
 		return NULL;
 	}
     /* LEO add parent scene */
-    if (source->parent_scene == scene)
-		return NULL;
     source->parent_scene = scene;
 
 	item = bzalloc(sizeof(struct obs_scene_item));

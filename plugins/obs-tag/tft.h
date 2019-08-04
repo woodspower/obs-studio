@@ -78,6 +78,7 @@ typedef struct tft_buffer {
 }tft_buffer_t;
 
 extern tft_buffer_t * tft_buffer_load(obs_scene_t *scene, const char *jsonfile);
+extern void tft_buffer_save(tft_buffer_t *buffer, const char *jsonfile);
 extern void tft_batch_set(tft_buffer_t *tftBuffer, long ref, uint32_t batchW, uint32_t batchH);
 extern void tft_batch_active(tft_buffer_t *tftBuffer);
 extern tft_batch_t * tft_batch_update(tft_buffer_t *buf, long ref, char *appName, char *sceneName);

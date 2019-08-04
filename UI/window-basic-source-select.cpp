@@ -111,14 +111,16 @@ static void AddSource(void *_data, obs_scene_t *scene)
 	AddSourceData *data = (AddSourceData *)_data;
 	obs_sceneitem_t *sceneitem;
 
-	sceneitem = obs_scene_add(scene, data->source);
     /* LEO: check if added or not */
     /* This will decide if free source or not */
-	if(sceneitem == NULL) {
-        printf ("Add source failed \n");
+	if(scene == obs_source_get_scene(data->source)) {
+        printf ("Add source failed since it is already added \n");
         data->result = false;
         return;
     }
+
+	sceneitem = obs_scene_add(scene, data->source);
+
     data->result = true;
 
 	obs_sceneitem_set_visible(sceneitem, data->visible);

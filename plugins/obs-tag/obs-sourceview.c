@@ -1082,15 +1082,14 @@ static void ss_deactivate(void *data)
 		ss->pause_on_deactivate = true;
 }
 
-#if 0
-static void ss_mouse_move(void *data, const struct obs_mouse_event *event, bool mouse_leave)
+static bool ss_save(void *data, obs_data_t *settings)
 {
-    if (mouse_leave == false) 
-        return;
-    
-    printf("ss position is %d, %d\n", event->x, event->y);
+	UNUSED_PARAMETER(settings);
+	struct sourceview *ss = data;
+
+    tft_buffer_save(ss->tftBuffer, "/home/leo/datas/arch/main.json");
+    return true;
 }
-#endif
 
 struct obs_source_info sourceview_info = {
 	.id                  = "sourceview",
@@ -1100,6 +1099,7 @@ struct obs_source_info sourceview_info = {
 	                       OBS_SOURCE_COMPOSITE,
 	.get_name            = ss_getname,
 	.create              = ss_create,
+	.save                = ss_save,
 	.destroy             = ss_destroy,
 	.update              = ss_update,
 	.activate            = ss_activate,

@@ -416,7 +416,10 @@ tft_batch_t * tft_batch_load(json_t *unit, tft_buffer_t *buffer)
 
     assert(json_typeof(unit) == JSON_OBJECT);
     subunit = json_object_get(unit, "ref");
-    assert(json_typeof(subunit) == JSON_INTEGER);
+    if ((subunit == NULL) || (json_typeof(subunit) != JSON_INTEGER)) {
+        LOGE("tft_batch_load: not found ref in file.\n");
+        return NULL;
+    }
     ref = json_integer_value(subunit);
 
     tmp = tft_batch_alloc(buffer, ref);
@@ -426,39 +429,42 @@ tft_batch_t * tft_batch_load(json_t *unit, tft_buffer_t *buffer)
     }
 
     subunit = json_object_get(unit, "app");
-    assert(json_typeof(subunit) == JSON_STRING);
-    name = (char *)json_string_value(subunit);
-    tft_area_new(tmp, TFT_AREA_TYPE_APP, name, pos,0,0);
+    if ((subunit != NULL) && (json_typeof(subunit) == JSON_STRING)) {
+        name = (char *)json_string_value(subunit);
+        tft_area_new(tmp, TFT_AREA_TYPE_APP, name, pos,0,0);
+    }
 
     subunit = json_object_get(unit, "scene");
-    assert(json_typeof(subunit) == JSON_STRING);
-    name = (char *)json_string_value(subunit);
-    tft_area_new(tmp, TFT_AREA_TYPE_SCENE, name, pos,0,0);
+    if ((subunit != NULL) && (json_typeof(subunit) == JSON_STRING)) {
+        name = (char *)json_string_value(subunit);
+        tft_area_new(tmp, TFT_AREA_TYPE_SCENE, name, pos,0,0);
+    }
 
     subunit = json_object_get(unit, "subareas");
-    assert(json_typeof(subunit) == JSON_ARRAY);
-    for(i=0; i<json_array_size(subunit); i++)
-    {
-        aunit = json_array_get(subunit, i);
-        assert(json_typeof(aunit) == JSON_OBJECT);
-        key = json_object_get(aunit, "type");
-        assert(json_typeof(key) == JSON_STRING);
-        name = (char *)json_string_value(key);
+    if ((subunit != NULL) && (json_typeof(subunit) == JSON_ARRAY)) {
+        for(i=0; i<json_array_size(subunit); i++)
+        {
+            aunit = json_array_get(subunit, i);
+            assert(json_typeof(aunit) == JSON_OBJECT);
+            key = json_object_get(aunit, "type");
+            assert(json_typeof(key) == JSON_STRING);
+            name = (char *)json_string_value(key);
 
-        key = json_object_get(aunit, "x");
-        assert(json_typeof(key) == JSON_INTEGER);
-        pos.x = (float)json_integer_value(key);
-        key = json_object_get(aunit, "y");
-        assert(json_typeof(key) == JSON_INTEGER);
-        pos.y = (float)json_integer_value(key);
-        key = json_object_get(aunit, "width");
-        assert(json_typeof(key) == JSON_INTEGER);
-        width = (unsigned)json_integer_value(key);
-        key = json_object_get(aunit, "height");
-        assert(json_typeof(key) == JSON_INTEGER);
-        height = (unsigned)json_integer_value(key);
-        
-        tft_area_new(tmp, TFT_AREA_TYPE_SUBAREA, name, pos, width, height);
+            key = json_object_get(aunit, "x");
+            assert(json_typeof(key) == JSON_INTEGER);
+            pos.x = (float)json_integer_value(key);
+            key = json_object_get(aunit, "y");
+            assert(json_typeof(key) == JSON_INTEGER);
+            pos.y = (float)json_integer_value(key);
+            key = json_object_get(aunit, "width");
+            assert(json_typeof(key) == JSON_INTEGER);
+            width = (unsigned)json_integer_value(key);
+            key = json_object_get(aunit, "height");
+            assert(json_typeof(key) == JSON_INTEGER);
+            height = (unsigned)json_integer_value(key);
+            
+            tft_area_new(tmp, TFT_AREA_TYPE_SUBAREA, name, pos, width, height);
+        }
     }
     return tmp;
 }
@@ -496,8 +502,8 @@ static bool __area_update_from_sceneitem(obs_scene_t *scene, obs_sceneitem_t *gr
 
     obs_sceneitem_get_pos(groupitem, &pos);
     obs_sceneitem_get_scale(groupitem, &scale);
-    uint32_t height = (uint32_t)((float)obs_source_get_height(source) * scale.x);
-    uint32_t width  = (uint32_t)((float)obs_source_get_width(source) * scale.y);
+    uint32_t height = (uint32_t)((float)obs_source_get_height(source) * scale.y);
+    uint32_t width  = (uint32_t)((float)obs_source_get_width(source) * scale.x);
     LOGD("__area_update_from_sceneitem: id=%s, name=%s, x=%f, y=%f, scale.x=%f, scale.y=%f, w=%d, h=%d\n", 
          id, fullname, pos.x, pos.y, scale.x, scale.y, width, height);
 
@@ -904,6 +910,92 @@ void tft_batch_active(tft_buffer_t *tftBuffer)
 */
 }
 
+json_t* tft_area_save(tft_area_t *area)
+{
+    json_t *jarea;
+
+    if (area->atype != TFT_AREA_TYPE_SUBAREA)
+        return NULL;
+
+    jarea = json_object();
+    json_object_set_new(jarea, "type", json_string(area->name));
+    json_object_set_new(jarea, "x", json_integer((area->pos.x)));
+    json_object_set_new(jarea, "y", json_integer((area->pos.y)));
+    json_object_set_new(jarea, "width", json_integer((area->width)));
+    json_object_set_new(jarea, "height", json_integer((area->height)));
+
+    return jarea;
+}
+
+json_t* tft_batch_save(tft_batch_t *batch)
+{
+    json_t *jbatch;
+    json_t *jarea, *jareas;
+    tft_area_t *area, *area0;
+
+    LOGI("------Batch ref: %ld\n", batch->ref);
+    //LOGI("------app.scene: %s.%s\n", batch->appArea->name, batch->sceneArea->name);
+    jbatch = json_object();
+    json_object_set_new(jbatch, "ref", json_integer(batch->ref));
+    if (batch->appArea != NULL)
+        json_object_set_new(jbatch, "app", json_string(batch->appArea->name));
+    if (batch->sceneArea != NULL)
+        json_object_set_new(jbatch, "scene", json_string(batch->sceneArea->name));
+
+    jareas = json_array();
+    area0 = batch->areas;
+    area = area0;
+    do {
+        if (area == NULL) break;
+        LOGI("----area name: type[%d]-%s-seq[%d]\n", area->atype, area->name, area->seq);
+        LOGI("(pos.x,pos.y,width,height): (%f,%f,%d,%d)\n",
+              area->pos.x,area->pos.y,area->width,area->height);
+        jarea = tft_area_save(area);
+        if (jarea != NULL)
+            json_array_append_new(jareas, jarea);
+        /* decrease ref to avoid memory leak */
+        // json_decref(jarea);
+
+        area = area->next;
+    }while(area != area0);
+
+    json_object_set_new(jbatch, "subareas", jareas);
+    /* decrease ref to avoid memory leak */
+    // json_decref(jareas);
+
+    return jbatch;
+}
+
+void tft_buffer_save(tft_buffer_t *buffer, const char *jsonfile)
+{
+    json_t *root;
+    json_t *jbatchs, *jbatch;
+    tft_batch_t *batch, *batch0;
+
+    root = json_object();
+    json_object_set_new(root, "name", json_string(buffer->name));
+
+    jbatchs = json_array();
+
+    batch0 = buffer->batchs;
+    batch = batch0;
+    do {
+        if(batch == NULL) break;
+        jbatch = tft_batch_save(batch);
+        json_array_append_new(jbatchs, jbatch);
+        /* decrease ref to avoid memory leak */
+        // json_decref(jbatch);
+
+        batch = batch->next;
+    }while(batch != batch0);
+
+    json_object_set_new(root, "batchs", jbatchs);
+    /* decrease ref to avoid memory leak */
+    // json_decref(jbatchs);
+
+    json_dump_file(root, jsonfile, 0);
+    json_decref(root);
+}
 
 tft_buffer_t * tft_buffer_load(obs_scene_t *scene, const char *jsonfile)
 {
@@ -961,7 +1053,7 @@ void tft_buffer_free(tft_buffer_t *buffer)
 
 void tft_buffer_print(tft_buffer_t *buf)
 {
-    char *name;
+    char *name = NULL, *appName = NULL, *sceneName = NULL;
     tft_batch_t *batch, *batch0;
     tft_area_t *area, *area0;
     if(buf == NULL) {
@@ -976,12 +1068,14 @@ void tft_buffer_print(tft_buffer_t *buf)
     do {
         assert(batch != NULL);
         LOGI("------Batch ref: %ld\n", batch->ref);
-        LOGI("------app.scene: %s.%s\n", batch->appArea->name, batch->sceneArea->name);
+        if (batch->appArea != NULL) appName = batch->appArea->name;
+        if (batch->sceneArea != NULL) sceneName = batch->sceneArea->name;
+        LOGI("------app.scene: %s.%s\n", appName, sceneName);
 
         area0 = batch->areas;
         area = area0;
         do {
-            assert(area != NULL);
+            if(area == NULL) break;
             LOGI("----area name: type[%d]-%s-seq[%d]\n", area->atype, area->name, area->seq);
             LOGI("(pos.x,pos.y,width,height): (%f,%f,%d,%d)\n",area->pos.x,area->pos.y,area->width,area->height);
             area = area->next;
